@@ -1,0 +1,101 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.ab3d2'
+version = '0.1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+    mainClass = 'com.ab3d2.Main'
+    applicationDefaultJvmArgs = [
+        '--enable-preview',
+        '-Xmx512m',
+        '-Dfile.encoding=UTF-8'
+    ]
+}
+
+ext {
+    lwjglVersion = '3.3.3'
+    // Détection automatique de la plateforme
+    lwjglNatives = {
+        def os = System.getProperty('os.name').toLowerCase()
+        def arch = System.getProperty('os.arch').toLowerCase()
+        if (os.contains('windows')) {
+            arch.contains('64') ? 'natives-windows' : 'natives-windows-x86'
+        } else if (os.contains('linux')) {
+            arch.contains('aarch') || arch.contains('arm') ? 'natives-linux-arm64' : 'natives-linux'
+        } else if (os.contains('mac')) {
+            arch.contains('aarch') ? 'natives-macos-arm64' : 'natives-macos'
+        } else {
+            throw new GradleException("Unsupported OS: ${os}")
+        }
+    }()
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // LWJGL core
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-openal'
+    implementation 'org.lwjgl:lwjgl-stb'
+    implementation 'org.lwjgl:lwjgl-nfd'   // Native file dialogs (utile pour l'éditeur)
+
+    // Natives
+    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-nfd::${lwjglNatives}"
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    runtimeOnly 'ch.qos.logback:logback-classic:1.4.11'
+
+    // Tests
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+compileJava {
+    options.compilerArgs += ['--enable-preview']
+}
+
+// Fat jar pour distribution
+jar {
+    manifest {
+        attributes 'Main-Class': 'com.ab3d2.Main'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+// Task utilitaire : affiche les infos de plateforme
+tasks.register('platformInfo') {
+    doLast {
+        println "OS      : ${System.getProperty('os.name')}"
+        println "Arch    : ${System.getProperty('os.arch')}"
+        println "Natives : ${lwjglNatives}"
+        println "Java    : ${System.getProperty('java.version')}"
+    }
+}
