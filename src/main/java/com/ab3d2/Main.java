@@ -11,7 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Alien Breed 3D II — Port Java/LWJGL Point d'entrée principal.
+ * Alien Breed 3D II — Port Java/LWJGL
+ * Point d'entrée principal.
  */
 public class Main {
 
@@ -25,10 +26,10 @@ public class Main {
         log.info("Assets root: {}", assetRoot.toAbsolutePath());
 
         // Création des composants
-        Window window = new Window("Alien Breed 3D II - Java Port", 3, true);
-        AssetManager assets = new AssetManager(assetRoot);
-        AudioManager audio = new AudioManager();
-        Renderer2D renderer = new Renderer2D(Window.GAME_WIDTH, Window.GAME_HEIGHT);
+        Window       window   = new Window("Alien Breed 3D II — Java Port", 3, true);
+        AssetManager assets   = new AssetManager(assetRoot);
+        AudioManager audio    = new AudioManager();
+        Renderer2D   renderer = new Renderer2D(Window.GAME_WIDTH, Window.GAME_HEIGHT);
 
         try {
             // Init dans le bon ordre
@@ -37,9 +38,9 @@ public class Main {
             audio.init();
             renderer.init();
 
-            GameContext ctx = new GameContext(window, assets, audio, renderer);
-            StateManager states = new StateManager();
-            GameLoop loop = new GameLoop(window, ctx, states);
+            GameContext   ctx     = new GameContext(window, assets, audio, renderer);
+            StateManager  states  = new StateManager();
+            GameLoop      loop    = new GameLoop(window, ctx, states);
 
             // Démarrage sur le menu principal
             loop.run(new GameState.MainMenu());

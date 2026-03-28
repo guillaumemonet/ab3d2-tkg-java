@@ -13,10 +13,10 @@ import static org.lwjgl.opengl.GL33.*;
 /**
  * Background du menu avec scroll vertical infini.
  *
- * Reproduit mnu_movescreen / mnu_screen de l'original : - L'image background
- * 320x256 est dupliquée verticalement (320x512) - Un offset de scroll
- * incrémente chaque frame (mnu_screenpos & 255) - On affiche fenêtre de 320x200
- * dans cette image 320x512
+ * Reproduit mnu_movescreen / mnu_screen de l'original :
+ *   - L'image background 320x256 est dupliquée verticalement (320x512)
+ *   - Un offset de scroll incrémente chaque frame (mnu_screenpos & 255)
+ *   - On affiche fenêtre de 320x200 dans cette image 320x512
  *
  * En Java : texture 320x512, on décale le V0 UV de la texture chaque frame.
  */
@@ -44,16 +44,16 @@ public class ScrollingBackground {
 
         // Duplique verticalement -> 320x512
         int[] pixels512 = new int[W * DOUBLED_H];
-        System.arraycopy(pixels256, 0, pixels512, 0, pixels256.length);
+        System.arraycopy(pixels256, 0, pixels512,       0, pixels256.length);
         System.arraycopy(pixels256, 0, pixels512, pixels256.length, pixels256.length);
 
         // Upload OpenGL
         ByteBuffer buf = ByteBuffer.allocateDirect(W * DOUBLED_H * 4);
         for (int px : pixels512) {
-            buf.put((byte) ((px >> 16) & 0xFF));
-            buf.put((byte) ((px >> 8) & 0xFF));
-            buf.put((byte) (px & 0xFF));
-            buf.put((byte) ((px >> 24) & 0xFF));
+            buf.put((byte)((px >> 16) & 0xFF));
+            buf.put((byte)((px >>  8) & 0xFF));
+            buf.put((byte)( px        & 0xFF));
+            buf.put((byte)((px >> 24) & 0xFF));
         }
         buf.flip();
 
@@ -74,13 +74,11 @@ public class ScrollingBackground {
     }
 
     /**
-     * Dessine le background avec le scroll actuel. UV V0 = offset dans la
-     * texture dupliquée.
+     * Dessine le background avec le scroll actuel.
+     * UV V0 = offset dans la texture dupliquée.
      */
     public void render(Renderer2D r, int destW, int destH) {
-        if (texture < 0) {
-            return;
-        }
+        if (texture < 0) return;
 
         // Offset en pixels -> UV
         // L'original : offset = (mnu_screenpos & 255) * ROWSIZE (en bytes)
@@ -93,10 +91,10 @@ public class ScrollingBackground {
 
     private int createSolidTexture(int argb) {
         ByteBuffer buf = ByteBuffer.allocateDirect(4);
-        buf.put((byte) ((argb >> 16) & 0xFF));
-        buf.put((byte) ((argb >> 8) & 0xFF));
-        buf.put((byte) (argb & 0xFF));
-        buf.put((byte) ((argb >> 24) & 0xFF));
+        buf.put((byte)((argb >> 16) & 0xFF));
+        buf.put((byte)((argb >>  8) & 0xFF));
+        buf.put((byte)( argb        & 0xFF));
+        buf.put((byte)((argb >> 24) & 0xFF));
         buf.flip();
         int tex = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, tex);
@@ -107,13 +105,8 @@ public class ScrollingBackground {
     }
 
     public void destroy() {
-        if (texture >= 0) {
-            glDeleteTextures(texture);
-            texture = -1;
-        }
+        if (texture >= 0) { glDeleteTextures(texture); texture = -1; }
     }
 
-    public int getTexture() {
-        return texture;
-    }
+    public int getTexture() { return texture; }
 }

@@ -17,12 +17,14 @@ import static org.lwjgl.stb.STBImage.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
- * Gestionnaire d'assets pour AB3D2. Formats supportés : - PNG/JPG/BMP : via STB
- * (pour assets de dev/test) - .256wad : texture indexée 256 couleurs (format
- * AB3D2 natif) - palette.bin : palette 256x3 RGB (extraite des assets Amiga)
+ * Gestionnaire d'assets pour AB3D2.
+ * Formats supportés :
+ *  - PNG/JPG/BMP  : via STB (pour assets de dev/test)
+ *  - .256wad      : texture indexée 256 couleurs (format AB3D2 natif)
+ *  - palette.bin  : palette 256x3 RGB (extraite des assets Amiga)
  *
- * Les assets sont cherchés dans ce chemin (configurable) : assets/ (à côté du
- * jar) ou src/main/resources/assets/ en dev
+ * Les assets sont cherchés dans ce chemin (configurable) :
+ *   assets/  (à côté du jar) ou src/main/resources/assets/ en dev
  */
 public class AssetManager {
 
@@ -46,10 +48,10 @@ public class AssetManager {
     // ──────────────────────────────────────────────────────────────────────────
     // Palette
     // ──────────────────────────────────────────────────────────────────────────
+
     /**
      * La palette par défaut est une palette grise si aucun fichier n'existe.
-     * Elle sera remplacée par la vraie palette AB3D2 une fois les assets
-     * chargés.
+     * Elle sera remplacée par la vraie palette AB3D2 une fois les assets chargés.
      */
     private void loadDefaultPalette() {
         Path palFile = assetRoot.resolve("palette.bin");
@@ -58,7 +60,7 @@ public class AssetManager {
                 byte[] data = Files.readAllBytes(palFile);
                 // Format : 256 entrées × 3 bytes RGB
                 for (int i = 0; i < 256 && i * 3 + 2 < data.length; i++) {
-                    int r = data[i * 3] & 0xFF;
+                    int r = data[i * 3]     & 0xFF;
                     int g = data[i * 3 + 1] & 0xFF;
                     int b = data[i * 3 + 2] & 0xFF;
                     palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
@@ -87,7 +89,7 @@ public class AssetManager {
         // Format Amiga AGA : 24-bit (via color registers étendu)
         // Ici on suppose RGB 8-bit direct (déjà converti)
         for (int i = 0; i < Math.min(256, rawPalette.length / 3); i++) {
-            int r = rawPalette[i * 3] & 0xFF;
+            int r = rawPalette[i * 3]     & 0xFF;
             int g = rawPalette[i * 3 + 1] & 0xFF;
             int b = rawPalette[i * 3 + 2] & 0xFF;
             palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
@@ -98,9 +100,9 @@ public class AssetManager {
     // ──────────────────────────────────────────────────────────────────────────
     // Chargement textures
     // ──────────────────────────────────────────────────────────────────────────
+
     /**
      * Charge une texture PNG/JPG/BMP via STB.
-     *
      * @param path chemin relatif depuis assetRoot
      */
     public int loadTexture(String path) {
@@ -116,9 +118,8 @@ public class AssetManager {
 
     /**
      * Charge une texture indexée .256wad (format AB3D2).
-     *
      * @param path chemin relatif
-     * @param width largeur en pixels
+     * @param width  largeur en pixels
      * @param height hauteur en pixels
      */
     public int load256Wad(String path, int width, int height) {
@@ -145,12 +146,12 @@ public class AssetManager {
     public int createTextureFromIndexed(byte[] indexed, int width, int height) {
         ByteBuffer rgba = ByteBuffer.allocateDirect(width * height * 4);
         for (int i = 0; i < Math.min(indexed.length, width * height); i++) {
-            int idx = indexed[i] & 0xFF;
+            int idx  = indexed[i] & 0xFF;
             int argb = palette[idx];
-            rgba.put((byte) ((argb >> 16) & 0xFF)); // R
-            rgba.put((byte) ((argb >> 8) & 0xFF)); // G
-            rgba.put((byte) (argb & 0xFF)); // B
-            rgba.put((byte) ((argb >> 24) & 0xFF)); // A
+            rgba.put((byte)((argb >> 16) & 0xFF)); // R
+            rgba.put((byte)((argb >>  8) & 0xFF)); // G
+            rgba.put((byte)( argb        & 0xFF)); // B
+            rgba.put((byte)((argb >> 24) & 0xFF)); // A
         }
         rgba.flip();
         return uploadTexture(rgba, width, height, false);
@@ -185,18 +186,14 @@ public class AssetManager {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        if (mipmap) {
-            glGenerateMipmap(GL_TEXTURE_2D);
-        }
+        if (mipmap) glGenerateMipmap(GL_TEXTURE_2D);
         return tex;
     }
 
-    /**
-     * Texture rose flashy = asset manquant, facile à débugger.
-     */
+    /** Texture rose flashy = asset manquant, facile à débugger. */
     private int createMagentaTexture() {
         ByteBuffer buf = ByteBuffer.allocateDirect(4);
-        buf.put((byte) 0xFF).put((byte) 0x00).put((byte) 0xFF).put((byte) 0xFF);
+        buf.put((byte)0xFF).put((byte)0x00).put((byte)0xFF).put((byte)0xFF);
         buf.flip();
         return uploadTexture(buf, 1, 1, false);
     }
@@ -207,10 +204,10 @@ public class AssetManager {
     public int createTextureFromARGB(int[] argb, int width, int height) {
         ByteBuffer buf = ByteBuffer.allocateDirect(width * height * 4);
         for (int px : argb) {
-            buf.put((byte) ((px >> 16) & 0xFF));
-            buf.put((byte) ((px >> 8) & 0xFF));
-            buf.put((byte) (px & 0xFF));
-            buf.put((byte) ((px >> 24) & 0xFF));
+            buf.put((byte)((px >> 16) & 0xFF));
+            buf.put((byte)((px >>  8) & 0xFF));
+            buf.put((byte)( px        & 0xFF));
+            buf.put((byte)((px >> 24) & 0xFF));
         }
         buf.flip();
         return uploadTexture(buf, width, height, false);
@@ -218,9 +215,7 @@ public class AssetManager {
 
     public void freeTexture(String path) {
         Integer tex = textureCache.remove(path);
-        if (tex != null) {
-            glDeleteTextures(tex);
-        }
+        if (tex != null) glDeleteTextures(tex);
     }
 
     public void destroy() {
@@ -228,11 +223,6 @@ public class AssetManager {
         textureCache.clear();
     }
 
-    public int[] getPalette() {
-        return palette;
-    }
-
-    public Path getRoot() {
-        return assetRoot;
-    }
+    public int[] getPalette() { return palette; }
+    public Path  getRoot()    { return assetRoot; }
 }

@@ -11,11 +11,12 @@ import java.nio.file.Path;
 /**
  * Charge et prépare tous les assets du menu AB3D2.
  *
- * Assets requis (dans assets/menu/) : back2.raw - background 2 bitplanes
- * 320x256 firepal.pal2 - palette feu 8 couleurs (format 00RRGGBB * 8)
- * font16x16.raw2 - police 16x16, 3 bitplanes, 20 chars/ligne, 11 lignes
- * back.pal - palette background 4 couleurs credits_only.raw - frame credits 3
- * bitplanes 320x192
+ * Assets requis (dans assets/menu/) :
+ *   back2.raw        - background 2 bitplanes 320x256
+ *   firepal.pal2     - palette feu 8 couleurs (format 00RRGGBB * 8)
+ *   font16x16.raw2   - police 16x16, 3 bitplanes, 20 chars/ligne, 11 lignes
+ *   back.pal         - palette background 4 couleurs
+ *   credits_only.raw - frame credits 3 bitplanes 320x192
  *
  * Optionnel : font16x16.pal2 (si absent, palette verte par défaut)
  */
@@ -24,22 +25,22 @@ public class MenuAssets {
     private static final Logger log = LoggerFactory.getLogger(MenuAssets.class);
 
     // Dimensions
-    public static final int SCREEN_W = 320;
-    public static final int SCREEN_H = 256;
-    public static final int ROWSIZE = SCREEN_W / 8;   // 40 bytes
+    public static final int SCREEN_W   = 320;
+    public static final int SCREEN_H   = 256;
+    public static final int ROWSIZE    = SCREEN_W / 8;   // 40 bytes
     public static final int PLANE_SIZE = ROWSIZE * SCREEN_H; // 10240
 
-    public static final int FONT_GLYPH_W = 16;
-    public static final int FONT_GLYPH_H = 16;
-    public static final int FONT_COLS = 20;
-    public static final int FONT_ROWS = 11;
-    public static final int FONT_W = FONT_COLS * FONT_GLYPH_W; // 320
-    public static final int FONT_H = FONT_ROWS * FONT_GLYPH_H; // 176
-    public static final int FONT_PLANES = 3;
+    public static final int FONT_GLYPH_W  = 16;
+    public static final int FONT_GLYPH_H  = 16;
+    public static final int FONT_COLS     = 20;
+    public static final int FONT_ROWS     = 11;
+    public static final int FONT_W        = FONT_COLS * FONT_GLYPH_W; // 320
+    public static final int FONT_H        = FONT_ROWS * FONT_GLYPH_H; // 176
+    public static final int FONT_PLANES   = 3;
 
     // ASCII 32 = premier glyphe (espace)
     public static final int FONT_FIRST_CHAR = 32;
-    public static final int FONT_NUM_CHARS = FONT_COLS * FONT_ROWS; // 220
+    public static final int FONT_NUM_CHARS  = FONT_COLS * FONT_ROWS; // 220
 
     // Données brutes
     private byte[] back2Raw;
@@ -54,8 +55,8 @@ public class MenuAssets {
 
     // Textures OpenGL
     private int backgroundTexture = -1;
-    private int fontTexture = -1;
-    private int creditsTexture = -1;
+    private int fontTexture        = -1;
+    private int creditsTexture     = -1;
 
     private boolean loaded = false;
 
@@ -64,20 +65,14 @@ public class MenuAssets {
         log.info("Loading menu assets from {}", root);
 
         // ── Palettes ──────────────────────────────────────────────────────────
-        backpal = loadPalFromFile(root.resolve("back.pal"), 4);
-        firepal = loadPalFromFile(root.resolve("firepal.pal2"), 8);
-        fontpal = loadPalFromFile(root.resolve("font16x16.pal2"), 8);
+        backpal  = loadPalFromFile(root.resolve("back.pal"),         4);
+        firepal  = loadPalFromFile(root.resolve("firepal.pal2"),     8);
+        fontpal  = loadPalFromFile(root.resolve("font16x16.pal2"),   8);
 
         // Fallback si fichiers manquants
-        if (backpal == null) {
-            backpal = buildDefaultBackpal();
-        }
-        if (firepal == null) {
-            firepal = buildDefaultFirepal();
-        }
-        if (fontpal == null) {
-            fontpal = buildDefaultFontpal();
-        }
+        if (backpal == null)  backpal  = buildDefaultBackpal();
+        if (firepal == null)  firepal  = buildDefaultFirepal();
+        if (fontpal == null)  fontpal  = buildDefaultFontpal();
 
         // Palette complète 256 couleurs (fusion)
         menuPalette = AmigaBitplaneDecoder.buildMenuPalette(backpal, firepal, fontpal);
@@ -87,7 +82,7 @@ public class MenuAssets {
         if (back2Raw != null) {
             // 2 bitplanes, 4 couleurs -> utilise backpal
             int[] bgPixels = AmigaBitplaneDecoder.decode(
-                    back2Raw, SCREEN_W, SCREEN_H, 2, backpal
+                back2Raw, SCREEN_W, SCREEN_H, 2, backpal
             );
             backgroundTexture = ctx.assets().createTextureFromARGB(bgPixels, SCREEN_W, SCREEN_H);
             log.info("Background texture loaded ({}x{})", SCREEN_W, SCREEN_H);
@@ -100,7 +95,7 @@ public class MenuAssets {
         if (fontRaw != null) {
             // 3 bitplanes séquentiels, image 320x176
             int[] fontPixels = AmigaBitplaneDecoder.decode(
-                    fontRaw, FONT_W, FONT_H, FONT_PLANES, buildFontPaletteWithAlpha()
+                fontRaw, FONT_W, FONT_H, FONT_PLANES, buildFontPaletteWithAlpha()
             );
             fontTexture = ctx.assets().createTextureFromARGB(fontPixels, FONT_W, FONT_H);
             log.info("Font texture loaded ({} glyphs 16x16)", FONT_NUM_CHARS);
@@ -114,8 +109,8 @@ public class MenuAssets {
             // 3 bitplanes, 320x192
             // Utilise les plans 3-5 de la palette complète (fontpal)
             int[] credPalette = buildCreditsPalette();
-            int[] credPixels = AmigaBitplaneDecoder.decode(
-                    creditsRaw, SCREEN_W, 192, FONT_PLANES, credPalette
+            int[] credPixels  = AmigaBitplaneDecoder.decode(
+                creditsRaw, SCREEN_W, 192, FONT_PLANES, credPalette
             );
             creditsTexture = ctx.assets().createTextureFromARGB(credPixels, SCREEN_W, 192);
             log.info("Credits texture loaded");
@@ -126,6 +121,7 @@ public class MenuAssets {
     }
 
     // ── Palette helpers ───────────────────────────────────────────────────────
+
     /**
      * Palette font avec index 0 = transparent (couleur de fond = alpha 0).
      */
@@ -185,6 +181,7 @@ public class MenuAssets {
     }
 
     // ── Palettes par défaut (si assets manquants) ─────────────────────────────
+
     private static int[] buildDefaultBackpal() {
         return new int[]{
             0xFF131317, 0xFF232B27, 0xFF1F231B, 0xFF131B1B
@@ -206,39 +203,14 @@ public class MenuAssets {
     }
 
     // ── Getters ───────────────────────────────────────────────────────────────
-    public int getBackgroundTexture() {
-        return backgroundTexture;
-    }
 
-    public int getFontTexture() {
-        return fontTexture;
-    }
-
-    public int getCreditsTexture() {
-        return creditsTexture;
-    }
-
-    public int[] getMenuPalette() {
-        return menuPalette;
-    }
-
-    public int[] getFirepal() {
-        return firepal;
-    }
-
-    public int[] getBackpal() {
-        return backpal;
-    }
-
-    public int[] getFontpal() {
-        return fontpal;
-    }
-
-    public byte[] getFontRaw() {
-        return fontRaw;
-    }
-
-    public boolean isLoaded() {
-        return loaded;
-    }
+    public int   getBackgroundTexture() { return backgroundTexture; }
+    public int   getFontTexture()       { return fontTexture; }
+    public int   getCreditsTexture()    { return creditsTexture; }
+    public int[] getMenuPalette()       { return menuPalette; }
+    public int[] getFirepal()           { return firepal; }
+    public int[] getBackpal()           { return backpal; }
+    public int[] getFontpal()           { return fontpal; }
+    public byte[] getFontRaw()          { return fontRaw; }
+    public boolean isLoaded()           { return loaded; }
 }

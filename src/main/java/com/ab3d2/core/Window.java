@@ -15,15 +15,15 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
- * Gestion de la fenêtre GLFW et du contexte OpenGL. Résolution cible : 320x200
- * (native AB3D2) upscalée.
+ * Gestion de la fenêtre GLFW et du contexte OpenGL.
+ * Résolution cible : 320x200 (native AB3D2) upscalée.
  */
 public class Window {
 
     private static final Logger log = LoggerFactory.getLogger(Window.class);
 
     // Résolution interne du jeu (Amiga OCS/AGA 320x200/256)
-    public static final int GAME_WIDTH = 320;
+    public static final int GAME_WIDTH  = 320;
     public static final int GAME_HEIGHT = 200;
 
     // Résolution de la fenêtre (upscale x3 par défaut)
@@ -37,10 +37,10 @@ public class Window {
     private InputHandler inputHandler;
 
     public Window(String title, int scale, boolean vsync) {
-        this.title = title;
-        this.scale = scale;
-        this.vsync = vsync;
-        this.windowWidth = GAME_WIDTH * scale;
+        this.title   = title;
+        this.scale   = scale;
+        this.vsync   = vsync;
+        this.windowWidth  = GAME_WIDTH  * scale;
         this.windowHeight = GAME_HEIGHT * scale;
     }
 
@@ -53,7 +53,7 @@ public class Window {
         }
 
         glfwDefaultWindowHints();
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_VISIBLE,   GLFW_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -77,9 +77,9 @@ public class Window {
             GLFWVidMode vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
             if (vidMode != null) {
                 glfwSetWindowPos(
-                        handle,
-                        (vidMode.width() - pw.get(0)) / 2,
-                        (vidMode.height() - ph.get(0)) / 2
+                    handle,
+                    (vidMode.width()  - pw.get(0)) / 2,
+                    (vidMode.height() - ph.get(0)) / 2
                 );
             }
         }
@@ -95,7 +95,7 @@ public class Window {
 
         // Resize callback
         glfwSetFramebufferSizeCallback(handle, (win, w, h) -> {
-            this.windowWidth = w;
+            this.windowWidth  = w;
             this.windowHeight = h;
             glViewport(0, 0, w, h);
             log.debug("Window resized: {}x{}", w, h);
@@ -128,50 +128,32 @@ public class Window {
         glfwSetErrorCallback(null).free();
     }
 
-    public long getHandle() {
-        return handle;
-    }
-
-    public int getWidth() {
-        return windowWidth;
-    }
-
-    public int getHeight() {
-        return windowHeight;
-    }
-
-    public int getGameWidth() {
-        return GAME_WIDTH;
-    }
-
-    public int getGameHeight() {
-        return GAME_HEIGHT;
-    }
-
-    public InputHandler getInput() {
-        return inputHandler;
-    }
+    public long getHandle()      { return handle; }
+    public int  getWidth()       { return windowWidth; }
+    public int  getHeight()      { return windowHeight; }
+    public int  getGameWidth()   { return GAME_WIDTH; }
+    public int  getGameHeight()  { return GAME_HEIGHT; }
+    public InputHandler getInput() { return inputHandler; }
 
     /**
-     * Ratio pixel : on garde l'aspect 16:10 (320/200) en letterbox ou
-     * pillarbox.
+     * Ratio pixel : on garde l'aspect 16:10 (320/200) en letterbox ou pillarbox.
      */
     public float[] getViewportRect() {
         float targetAspect = (float) GAME_WIDTH / GAME_HEIGHT;
-        float winAspect = (float) windowWidth / windowHeight;
+        float winAspect    = (float) windowWidth / windowHeight;
         int vpW, vpH, vpX, vpY;
 
         if (winAspect > targetAspect) {
             vpH = windowHeight;
-            vpW = (int) (windowHeight * targetAspect);
+            vpW = (int)(windowHeight * targetAspect);
             vpX = (windowWidth - vpW) / 2;
             vpY = 0;
         } else {
             vpW = windowWidth;
-            vpH = (int) (windowWidth / targetAspect);
+            vpH = (int)(windowWidth / targetAspect);
             vpX = 0;
             vpY = (windowHeight - vpH) / 2;
         }
-        return new float[]{vpX, vpY, vpW, vpH};
+        return new float[]{ vpX, vpY, vpW, vpH };
     }
 }

@@ -13,19 +13,19 @@ public class GameLoop {
 
     private static final Logger log = LoggerFactory.getLogger(GameLoop.class);
 
-    private static final double FIXED_DT = 1.0 / 60.0; // 60 Hz logique
+    private static final double FIXED_DT    = 1.0 / 60.0; // 60 Hz logique
     private static final double MAX_FRAME_TIME = 0.25;     // Evite la spirale de la mort
 
-    private final Window window;
-    private final GameContext ctx;
+    private final Window       window;
+    private final GameContext  ctx;
     private final StateManager stateManager;
 
-    private long frameCount = 0;
-    private double fps = 0;
+    private long   frameCount = 0;
+    private double fps        = 0;
 
     public GameLoop(Window window, GameContext ctx, StateManager stateManager) {
-        this.window = window;
-        this.ctx = ctx;
+        this.window       = window;
+        this.ctx          = ctx;
         this.stateManager = stateManager;
     }
 
@@ -35,11 +35,11 @@ public class GameLoop {
         double currentTime = getTime();
         double accumulator = 0.0;
 
-        double fpsTimer = 0;
-        long fpsFrames = 0;
+        double fpsTimer    = 0;
+        long   fpsFrames   = 0;
 
         while (!window.shouldClose()) {
-            double newTime = getTime();
+            double newTime   = getTime();
             double frameTime = Math.min(newTime - currentTime, MAX_FRAME_TIME);
             currentTime = newTime;
 
@@ -76,7 +76,7 @@ public class GameLoop {
                 fps = fpsFrames / fpsTimer;
                 window.setTitle(String.format("FPS: %.0f", fps));
                 fpsFrames = 0;
-                fpsTimer = 0;
+                fpsTimer  = 0;
             }
         }
 
@@ -87,7 +87,5 @@ public class GameLoop {
         return System.nanoTime() / 1_000_000_000.0;
     }
 
-    public double getFps() {
-        return fps;
-    }
+    public double getFps() { return fps; }
 }

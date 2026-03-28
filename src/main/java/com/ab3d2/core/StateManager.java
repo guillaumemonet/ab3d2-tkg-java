@@ -15,12 +15,12 @@ public class StateManager {
     private static final Logger log = LoggerFactory.getLogger(StateManager.class);
 
     private final Map<Class<? extends GameState>, Screen> screens = new HashMap<>();
-    private Screen currentScreen;
+    private Screen  currentScreen;
     private GameState currentState;
 
     public StateManager() {
         // Enregistrement de tous les screens
-        register(GameState.MainMenu.class, new MainMenuScreen());
+        register(GameState.MainMenu.class,    new MainMenuScreen());
         // register(GameState.LevelSelect.class, new LevelSelectScreen());
         // register(GameState.InGame.class,      new InGameScreen());
         // register(GameState.LevelEditor.class, new LevelEditorScreen());
@@ -38,7 +38,7 @@ public class StateManager {
             currentScreen.destroy(ctx);
         }
 
-        currentState = newState;
+        currentState  = newState;
         currentScreen = screens.get(newState.getClass());
 
         if (currentScreen == null) {
@@ -49,9 +49,7 @@ public class StateManager {
     }
 
     public void update(GameContext ctx, double deltaTime) {
-        if (currentScreen == null) {
-            return;
-        }
+        if (currentScreen == null) return;
 
         GameState next = currentScreen.update(ctx, deltaTime);
         if (next != null) {
@@ -65,7 +63,5 @@ public class StateManager {
         }
     }
 
-    public GameState getCurrentState() {
-        return currentState;
-    }
+    public GameState getCurrentState() { return currentState; }
 }
