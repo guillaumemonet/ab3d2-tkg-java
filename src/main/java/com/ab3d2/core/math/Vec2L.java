@@ -1,3 +1,5 @@
+package com.ab3d2.core.math;
+
 // Vec2L.java
 // Represents a 32-bit XZ vector
 

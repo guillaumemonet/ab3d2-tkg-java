@@ -1,11 +1,16 @@
+package com.ab3d2.core.level;
+
+
+import java.util.List;
+
 public class Zone {
     private int zoneId;
     private float floor;
     private float roof;
     private int brightness;
-    private List<Edge> edges;
+    private List<ZEdge> edges;
 
-    public Zone(int zoneId, float floor, float roof, int brightness, List<Edge> edges) {
+    public Zone(int zoneId, float floor, float roof, int brightness, List<ZEdge> edges) {
         this.zoneId = zoneId;
         this.floor = floor;
         this.roof = roof;
@@ -29,7 +34,7 @@ public class Zone {
         return brightness;
     }
 
-    public List<Edge> getEdges() {
+    public List<ZEdge> getEdges() {
         return edges;
     }
 }

@@ -10,14 +10,16 @@ import org.slf4j.LoggerFactory;
 /**
  * Menu principal AB3D2.
  *
- * Architecture de rendu (fidèle à l'original) : 1. Background scrollant (plans
- * 0-1, back2.raw) 2. FireEffect (plans 0-5 simulés, blend additif) : - bits 0-2
- * : points Lissajous (mnu_plot, plans 0-2) - bits 3-5 : feu + TEXTE (même plans
- * 3-5, le texte brûle par le bas) 3. Fade noir
+ * Architecture de rendu (fidèle à l'original) :
+ *   1. Background scrollant (plans 0-1, back2.raw)
+ *   2. FireEffect (plans 0-5 simulés, blend additif) :
+ *      - bits 0-2 : points Lissajous (mnu_plot, plans 0-2)
+ *      - bits 3-5 : feu + TEXTE (même plans 3-5, le texte brûle par le bas)
+ *   3. Fade noir
  *
- * Le texte est rendu dans MenuRenderer (buffer bitplane), injecté dans
- * FireEffect. Les crédits (credits_only.raw) s'affichent UNIQUEMENT sur "GAME
- * CREDITS" (reproduit mnu_viewcredz : remplace le texte, retour sur touche).
+ * Le texte est rendu dans MenuRenderer (buffer bitplane), injecté dans FireEffect.
+ * Les crédits (credits_only.raw) s'affichent UNIQUEMENT sur "GAME CREDITS"
+ * (reproduit mnu_viewcredz : remplace le texte, retour sur touche).
  */
 public class MainMenuScreen implements Screen {
 
@@ -29,16 +31,16 @@ public class MainMenuScreen implements Screen {
     // ── Positions ASM ─────────────────────────────────────────────────────────
     // mnu_mainmenu: dc.w 6,12 (xPos bytes, yPos px), dc.w 4,70 (curX bytes, curY px), spread=20
     private static final int MAIN_X_BYTES = 6;   // xPos texte en bytes
-    private static final int MAIN_Y = 12;
-    private static final int MAIN_CUR_X = 4;   // curX en bytes
-    private static final int MAIN_CUR_Y = 70;
-    private static final int MAIN_SPREAD = 20;
+    private static final int MAIN_Y       = 12;
+    private static final int MAIN_CUR_X   = 4;   // curX en bytes
+    private static final int MAIN_CUR_Y   = 70;
+    private static final int MAIN_SPREAD  = 20;
     // mnu_quitmenu: dc.w 4,82, dc.w 4,120, spread=20
     private static final int QUIT_X_BYTES = 4;
-    private static final int QUIT_Y = 82;
-    private static final int QUIT_CUR_X = 4;
-    private static final int QUIT_CUR_Y = 120;
-    private static final int QUIT_SPREAD = 20;
+    private static final int QUIT_Y       = 82;
+    private static final int QUIT_CUR_X   = 4;
+    private static final int QUIT_CUR_Y   = 120;
+    private static final int QUIT_SPREAD  = 20;
 
     // ── Textes (depuis ASM, majuscules) ───────────────────────────────────────
     private static final String[] MAIN_ITEMS = {
@@ -51,22 +53,21 @@ public class MainMenuScreen implements Screen {
     private static final String PORT_CREDIT = "PORTED BY GUILLAUME MONET";
 
     // ── Composants ────────────────────────────────────────────────────────────
-    private MenuAssets assets;
+    private MenuAssets          assets;
     private ScrollingBackground background;
-    private FireEffect fire;
-    private MenuRenderer menuRenderer; // texte -> buffer bitplane
-    private MenuCursor cursor;
+    private FireEffect          fire;
+    private MenuRenderer        menuRenderer; // texte -> buffer bitplane
+    private MenuCursor          cursor;
 
     // ── État ──────────────────────────────────────────────────────────────────
-    private enum Mode {
-        MAIN, QUIT, CREDITS
-    }
-    private Mode mode = Mode.MAIN;
-    private int selectedItem = 0;
-    private Mode prevMode = null; // pour détecter les changements
+    private enum Mode { MAIN, QUIT, CREDITS }
+    private Mode mode         = Mode.MAIN;
+    private int  selectedItem = 0;
+    private Mode prevMode     = null; // pour détecter les changements
+    private int  prevSelected = -1;
 
-    private float fadeAlpha = 0f;
-    private float fadeTarget = 1f;
+    private float     fadeAlpha         = 0f;
+    private float     fadeTarget        = 1f;
     private GameState pendingTransition = null;
 
     @Override
@@ -81,46 +82,41 @@ public class MainMenuScreen implements Screen {
 
         // FireEffect reçoit la palette complète 256 couleurs
         fire = new FireEffect(assets.getMenuPalette());
-        fire.init();
+        //fire.init();
 
         menuRenderer = new MenuRenderer(assets.getFontRaw());
         cursor = new MenuCursor();
 
-        mode = Mode.MAIN;
-        selectedItem = 0;
-        prevMode = null;
-        fadeAlpha = 0f;
-        fadeTarget = 1f;
+        mode              = Mode.MAIN;
+        selectedItem      = 0;
+        prevMode          = null;
+        prevSelected      = -1;
+        fadeAlpha         = 0f;
+        fadeTarget        = 1f;
         pendingTransition = null;
 
         // Rendu initial du texte
         rebuildTextLayer();
 
         log.info("Menu ready — bg={}, fire={}, font={}",
-                background.getTexture(), fire.getTexture(), assets.getFontTexture());
+            background.getTexture(), fire.getTexture(), assets.getFontTexture());
     }
 
     @Override
     public GameState update(GameContext ctx, double dt) {
-        if (fadeAlpha < fadeTarget) {
-            fadeAlpha = Math.min(1f, fadeAlpha + (float) (dt * 2.0));
-        } else if (fadeAlpha > fadeTarget) {
-            fadeAlpha = Math.max(0f, fadeAlpha - (float) (dt * 2.0));
-        }
+        if (fadeAlpha < fadeTarget) fadeAlpha = Math.min(1f, fadeAlpha + (float)(dt * 2.0));
+        else if (fadeAlpha > fadeTarget) fadeAlpha = Math.max(0f, fadeAlpha - (float)(dt * 2.0));
 
-        if (pendingTransition != null && fadeAlpha <= 0.01f) {
-            return pendingTransition;
-        }
-        if (pendingTransition != null) {
-            return null;
-        }
+        if (pendingTransition != null && fadeAlpha <= 0.01f) return pendingTransition;
+        if (pendingTransition != null) return null;
 
         background.update();
 
-        // Rebuild texte si mode a changé
-        if (mode != prevMode) {
+        // Rebuild texte si mode ou sélection a changé
+        if (mode != prevMode || selectedItem != prevSelected) {
             rebuildTextLayer();
-            prevMode = mode;
+            prevMode     = mode;
+            prevSelected = selectedItem;
         }
 
         fire.update();
@@ -129,9 +125,7 @@ public class MainMenuScreen implements Screen {
         return null;
     }
 
-    /**
-     * Régénère le buffer texte dans le feu.
-     */
+    /** Régénère le buffer texte dans le feu. */
     private void rebuildTextLayer() {
         menuRenderer.clear();
 
@@ -155,6 +149,14 @@ public class MainMenuScreen implements Screen {
             }
         }
 
+        // Curseur dans le textLayer (s'enflamme aussi)
+        {
+            int curX  = (mode == Mode.MAIN ? MAIN_CUR_X : QUIT_CUR_X);
+            int curY  = (mode == Mode.MAIN ? MAIN_CUR_Y : QUIT_CUR_Y)
+                      + selectedItem * (mode == Mode.MAIN ? MAIN_SPREAD : QUIT_SPREAD);
+            int glyph = cursor.getCurrentGlyph();
+            menuRenderer.drawString(String.valueOf((char)glyph), curX, curY);
+        }
         fire.setTextLayer(menuRenderer.getTextLayer());
     }
 
@@ -162,69 +164,42 @@ public class MainMenuScreen implements Screen {
         InputHandler in = ctx.input();
 
         if (mode == Mode.CREDITS) {
-            if (anyKey(in)) {
-                switchTo(Mode.MAIN, 2);
-            }
+            if (anyKey(in)) { switchTo(Mode.MAIN, 2); }
             return;
         }
 
         String[] items = (mode == Mode.MAIN) ? MAIN_ITEMS : QUIT_ITEMS;
-        if (in.isKeyPressed(GLFW.GLFW_KEY_UP) || in.isKeyPressed(GLFW.GLFW_KEY_W)) {
-            selectedItem = (selectedItem - 1 + items.length) % items.length;
-            cursor.reset();
-        }
-        if (in.isKeyPressed(GLFW.GLFW_KEY_DOWN) || in.isKeyPressed(GLFW.GLFW_KEY_S)) {
-            selectedItem = (selectedItem + 1) % items.length;
-            cursor.reset();
-        }
-        if (in.isKeyPressed(GLFW.GLFW_KEY_ENTER) || in.isKeyPressed(GLFW.GLFW_KEY_SPACE)) {
+        if (in.isKeyPressed(GLFW.GLFW_KEY_UP)   || in.isKeyPressed(GLFW.GLFW_KEY_W))
+            { selectedItem = (selectedItem - 1 + items.length) % items.length; cursor.reset(); }
+        if (in.isKeyPressed(GLFW.GLFW_KEY_DOWN)  || in.isKeyPressed(GLFW.GLFW_KEY_S))
+            { selectedItem = (selectedItem + 1) % items.length; cursor.reset(); }
+        if (in.isKeyPressed(GLFW.GLFW_KEY_ENTER) || in.isKeyPressed(GLFW.GLFW_KEY_SPACE))
             activate(ctx);
-        }
-        if (in.isKeyPressed(GLFW.GLFW_KEY_ESCAPE)) {
-            if (mode == Mode.QUIT) {
-                switchTo(Mode.MAIN, 0);
-            } else {
-                switchTo(Mode.QUIT, 0);
-            }
-        }
+        if (in.isKeyPressed(GLFW.GLFW_KEY_ESCAPE))
+            { if (mode == Mode.QUIT) switchTo(Mode.MAIN, 0); else switchTo(Mode.QUIT, 0); }
     }
 
     private boolean anyKey(InputHandler in) {
         return in.isKeyPressed(GLFW.GLFW_KEY_ENTER) || in.isKeyPressed(GLFW.GLFW_KEY_SPACE)
-                || in.isKeyPressed(GLFW.GLFW_KEY_ESCAPE) || in.isKeyPressed(GLFW.GLFW_KEY_BACKSPACE);
+            || in.isKeyPressed(GLFW.GLFW_KEY_ESCAPE) || in.isKeyPressed(GLFW.GLFW_KEY_BACKSPACE);
     }
 
     private void activate(GameContext ctx) {
         if (mode == Mode.MAIN) {
             switch (MAIN_ITEMS[selectedItem]) {
-                case "PLAY GAME" ->
-                    fadeAndGo(new GameState.LevelSelect());
-                case "GAME CREDITS" ->
-                    switchTo(Mode.CREDITS, 0);
-                case "QUIT" ->
-                    switchTo(Mode.QUIT, 0);
-                default ->
-                    log.warn("'{}' not implemented yet", MAIN_ITEMS[selectedItem]);
+                case "PLAY GAME"    -> fadeAndGo(new GameState.LevelSelect());
+                case "GAME CREDITS" -> switchTo(Mode.CREDITS, 0);
+                case "QUIT"         -> switchTo(Mode.QUIT, 0);
+                default -> log.warn("'{}' not implemented yet", MAIN_ITEMS[selectedItem]);
             }
         } else {
-            if (selectedItem == 0) {
-                switchTo(Mode.MAIN, 0);
-            } else {
-                GLFW.glfwSetWindowShouldClose(ctx.window().getHandle(), true);
-            }
+            if (selectedItem == 0) switchTo(Mode.MAIN, 0);
+            else GLFW.glfwSetWindowShouldClose(ctx.window().getHandle(), true);
         }
     }
 
-    private void switchTo(Mode m, int sel) {
-        mode = m;
-        selectedItem = sel;
-        cursor.reset();
-    }
-
-    private void fadeAndGo(GameState next) {
-        fadeTarget = 0f;
-        pendingTransition = next;
-    }
+    private void switchTo(Mode m, int sel) { mode = m; selectedItem = sel; cursor.reset(); }
+    private void fadeAndGo(GameState next) { fadeTarget = 0f; pendingTransition = next; }
 
     @Override
     public void render(GameContext ctx, double alpha) {
@@ -242,7 +217,7 @@ public class MainMenuScreen implements Screen {
         // 3. Feu + texte + points (blend ADDITIF)
         // Le texte est dans le buffer fire (bits 3-5), s'additionne sur le background
         if (fire.getTexture() >= 0) {
-            r.drawTextureAdditive(fire.getTexture(), 0, 0, GW, GH);
+            r.drawTexture(fire.getTexture(), 0, 0, GW, GH);
         }
 
         // 4. Curseur (rendu dans le feu aussi via menuRenderer serait idéal,
@@ -255,25 +230,21 @@ public class MainMenuScreen implements Screen {
         r.drawFadeOverlay(1f - fadeAlpha);
 
         r.endFrame(ctx.window().getWidth(), ctx.window().getHeight(),
-                ctx.window().getViewportRect());
+                   ctx.window().getViewportRect());
     }
 
     /**
-     * Curseur glyphe rendu directement via la texture font (overlay au-dessus
-     * du feu). Dans l'original le curseur est aussi dans les plans 3-5, donc
-     * dans le feu. On le met en overlay pour qu'il reste toujours visible.
+     * Curseur glyphe rendu directement via la texture font (overlay au-dessus du feu).
+     * Dans l'original le curseur est aussi dans les plans 3-5, donc dans le feu.
+     * On le met en overlay pour qu'il reste toujours visible.
      */
     private void renderCursorOverlay(Renderer2D r) {
-        if (assets.getFontTexture() < 0) {
-            return;
-        }
+        if (assets.getFontTexture() < 0) return;
 
         // Glyphe curseur courant
         int c = cursor.getCurrentGlyph();
         int idx = c - 32;
-        if (idx < 0 || idx >= MenuAssets.FONT_NUM_CHARS) {
-            return;
-        }
+        if (idx < 0 || idx >= MenuAssets.FONT_NUM_CHARS) return;
 
         int atlasX = (idx % MenuAssets.FONT_COLS) * MenuAssets.FONT_GLYPH_W;
         int atlasY = (idx / MenuAssets.FONT_COLS) * MenuAssets.FONT_GLYPH_H;
@@ -282,30 +253,23 @@ public class MainMenuScreen implements Screen {
         float u1 = u0 + (float) MenuAssets.FONT_GLYPH_W / MenuAssets.FONT_W;
         float v1 = v0 + (float) MenuAssets.FONT_GLYPH_H / MenuAssets.FONT_H;
 
-        float cx = (mode == Mode.MAIN ? MAIN_CUR_X : QUIT_CUR_X) * 8f - 16f;
-        float cy = (mode == Mode.MAIN ? MAIN_CUR_Y : QUIT_CUR_Y)
-                + selectedItem * (mode == Mode.MAIN ? MAIN_SPREAD : QUIT_SPREAD);
+        float cx   = (mode == Mode.MAIN ? MAIN_CUR_X : QUIT_CUR_X) * 8f;
+        float cy   = (mode == Mode.MAIN ? MAIN_CUR_Y : QUIT_CUR_Y)
+                   + selectedItem * (mode == Mode.MAIN ? MAIN_SPREAD : QUIT_SPREAD);
 
         r.drawTexture(assets.getFontTexture(), cx, cy,
-                MenuAssets.FONT_GLYPH_W, MenuAssets.FONT_GLYPH_H, u0, v0, u1, v1);
+                      MenuAssets.FONT_GLYPH_W, MenuAssets.FONT_GLYPH_H, u0, v0, u1, v1);
     }
 
     @Override
     public void destroy(GameContext ctx) {
-        if (background != null) {
-            background.destroy();
-        }
-        if (fire != null) {
-            fire.destroy();
-        }
+        if (background != null) background.destroy();
+        if (fire       != null) fire.destroy();
         log.info("MainMenuScreen destroyed");
     }
 
     private byte[] readFile(GameContext ctx, String path) {
-        try {
-            return java.nio.file.Files.readAllBytes(ctx.assets().getRoot().resolve(path));
-        } catch (java.io.IOException e) {
-            return null;
-        }
+        try { return java.nio.file.Files.readAllBytes(ctx.assets().getRoot().resolve(path)); }
+        catch (java.io.IOException e) { return null; }
     }
 }

@@ -1,3 +1,8 @@
+package com.ab3d2.core.level;
+
+
+import com.ab3d2.core.level.Position;
+
 public class ZEdge {
     private Position position;
     private double length;
