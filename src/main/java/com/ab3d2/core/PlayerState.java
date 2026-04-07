@@ -25,8 +25,8 @@ public class PlayerState {
 
     public static final int PLR_STAND_HEIGHT  = 12 * 1024;  // 12288
     public static final int PLR_CROUCH_HEIGHT = 8  * 1024;  // 8192
-    public static final int ANGLE_MAX         = 4096;        // un cycle
-    public static final int ANGLE_QUARTER     = ANGLE_MAX / 4; // 90°
+    public static final int ANGLE_MAX         = 8192;        // un cycle complet (confirme : bigsine = 8192 entrees)
+    public static final int ANGLE_QUARTER     = ANGLE_MAX / 4; // 2048 = 90°
     public static final int INITIAL_ENERGY    = 191;
     public static final float WORLD_SPEED     = 128.0f;      // pixels/sec en virgule fixe
 

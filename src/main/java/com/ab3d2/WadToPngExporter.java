@@ -165,12 +165,13 @@ public class WadToPngExporter {
     // ── Palette ───────────────────────────────────────────────────────────────
 
     static int[] loadPalette(Path root) throws IOException {
-        for (String name : new String[]{"palette.bin", "pal.bin"}) {
+        // Priorite : 256pal.bin (vraie palette du jeu) > palette.bin
+        for (String name : new String[]{"256pal.bin", "palette.bin", "pal.bin"}) {
             Path p = root.resolve(name);
             if (Files.exists(p)) {
                 byte[] raw = Files.readAllBytes(p);
                 int[] pal  = parsePaletteAmiga(raw);
-                System.out.println("Palette chargee depuis : " + p.getFileName()
+                System.out.println("Palette : " + p.getFileName()
                     + " (" + raw.length + " bytes, " + pal.length + " couleurs)");
                 return pal;
             }

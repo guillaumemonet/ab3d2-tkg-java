@@ -112,6 +112,10 @@ public class TexturedRenderer3D {
         for (WallRenderEntry entry : entries) {
             if (!entry.isWall()) continue;
 
+            // tex_index >= 16 = portail/transparent : jamais rendu dans l'original
+            // (index negatif dans Draw_WallTexturePtrs_vl en M68k signe)
+            if (entry.texIndex < 0 || entry.texIndex >= WallTextureManager.NUM_WALL_TEXTURES) continue;
+
             // Recuperer les points 2D des extremites du mur
             int leftIdx  = entry.leftPt  & 0xFFFF;
             int rightIdx = entry.rightPt & 0xFFFF;
@@ -181,9 +185,15 @@ public class TexturedRenderer3D {
         int wMask = texW - 1;
         int hMask = texH - 1;
 
-        // Offset texture depuis l'entree (from_tile = decalage horizontal)
-        float texOffX = (entry.fromTile & 0xFFFF) / 16.0f;  // fromTile est << 4 dans l'ASM
-        float texOffY = entry.yOffset & 0xFFFF;
+        // Offset texture depuis l'entree
+        // fromTile peut etre un WORD signe : masquer a 16 bits puis diviser
+        float texOffX = (entry.fromTile & 0xFFFF) < 32768
+            ? (entry.fromTile & 0xFFFF) / 16.0f
+            : 0.0f;
+        // yOffset idem : valeurs negatives (0xFF..) = pas d'offset vertical
+        float texOffY = (entry.yOffset & 0xFFFF) < 32768
+            ? (entry.yOffset & 0xFFFF) / 256.0f
+            : 0.0f;
 
         // Facteur de repetition horizontal : 1 repetition = TEX_SCALE_H monde
         // texU avance de (wallLenWorld / TEX_SCALE_H * texW) sur toute la largeur
@@ -206,14 +216,9 @@ public class TexturedRenderer3D {
             if (cz >= depthBuf[col]) continue;
             depthBuf[col] = cz;
 
-            // Coordonnee texture U (perspective-correct)
-            float u = (invZ1 / invZ) * 0 + (1 - invZ1 / invZ) * totalU; // t*totalU perspective
-            // Version perspective-correcte : lerp de 0 a totalU en espace perspective
-            float uPersp = ((t * invZ2 + (1 - t) * invZ1) == 0) ? 0
-                : (t * invZ2 / invZ) * totalU;
-            // Simpler: u = t * totalU (approximation lineaire ok pour petits murs)
-            u = t * totalU + texOffX;
-            int texU = ((int) u) % Math.max(1, texW);
+            // Coordonnee U — modulo positif obligatoire (Java % peut retourner negatif)
+            float u = t * totalU + texOffX;
+            int texU = Math.floorMod((int) u, Math.max(1, texW));
 
             // Projeter les hauteurs du mur a cette profondeur
             float screenTop = Camera.projectY(topH, camera.eyeH, cz);
@@ -237,16 +242,11 @@ public class TexturedRenderer3D {
             int safeTexW = Math.max(1, texW);
             int safeTexH = Math.max(1, texH);
             for (int row = yTop; row < yBot; row++) {
-                // V en fonction de la position dans la colonne
-                float dy   = row - screenTop;
-                float v    = dy * texVscale + texOffY;
-                // Utiliser % pour eviter ArrayIndexOutOfBounds
-                // (les dimensions detectees peuvent differer de wMask/hMask)
-                int texV   = ((int) v % safeTexH + safeTexH) % safeTexH;
-                int texU2  = texU % safeTexW;
-                int texPx  = tpixels[texV * safeTexW + texU2];
-
-                // Fog de profondeur simple
+                float dy  = row - screenTop;
+                float v   = dy * texVscale + texOffY;
+                // Math.floorMod garantit un resultat positif meme si v < 0
+                int texV  = Math.floorMod((int) v, safeTexH);
+                int texPx = tpixels[texV * safeTexW + texU];
                 pixels[row * W + col] = fogColor(texPx, cz);
             }
         }

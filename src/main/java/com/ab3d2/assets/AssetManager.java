@@ -71,7 +71,10 @@ public class AssetManager {
      * </ul>
      */
     private void loadDefaultPalette() {
-        Path palFile = assetRoot.resolve("palette.bin");
+        // Priorite : 256pal.bin (vraie palette jeu, incbin "256pal" dans draw_data.s)
+        // Fallback : palette.bin (peut etre une rampe de gris)
+        Path palFile = assetRoot.resolve("256pal.bin");
+        if (!Files.exists(palFile)) palFile = assetRoot.resolve("palette.bin");
         if (Files.exists(palFile)) {
             try {
                 byte[] data = Files.readAllBytes(palFile);

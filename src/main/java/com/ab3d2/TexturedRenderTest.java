@@ -142,7 +142,7 @@ public class TexturedRenderTest {
     // ── Charger la palette ────────────────────────────────────────────────────
 
     static int[] loadPalette(Path root) throws IOException {
-        for (String candidate : new String[]{"palette.bin", "pal.bin", "palette"}) {
+        for (String candidate : new String[]{"256pal.bin", "palette.bin", "pal.bin", "palette"}) {
             Path p = root.resolve(candidate);
             if (Files.exists(p)) {
                 byte[] raw = Files.readAllBytes(p);

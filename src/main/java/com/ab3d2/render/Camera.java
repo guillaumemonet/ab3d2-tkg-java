@@ -70,7 +70,7 @@ public class Camera {
     }
 
     public void setAngle(int angle) {
-        this.angle  = angle & 4095;
+        this.angle  = angle & 8191;  // ANGLE_MAX = 8192
         this.sinVal = Tables.sinf(this.angle);
         this.cosVal = Tables.cosf(this.angle);
     }
