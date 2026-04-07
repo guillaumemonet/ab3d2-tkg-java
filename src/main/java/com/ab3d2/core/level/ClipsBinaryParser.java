@@ -1,43 +1,37 @@
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
+package com.ab3d2.core.level;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.file.*;
 
+/**
+ * Parse le fichier {@code twolev.clips} — clips de sprites par zone.
+ * <p>
+ * Format : à documenter par reverse-engineering (TODO).
+ * Ce fichier contient les données de découpe verticale des sprites
+ * pour chaque zone du niveau.
+ * </p>
+ *
+ * @deprecated Implémentation en cours — structure binaire non encore confirmée.
+ */
 public class ClipsBinaryParser {
 
-    private int frameCount;
-    private int frameWidth;
-    private int frameHeight;
-    private BufferedImage[] frames;
+    public ClipsBinaryParser() {}
 
-    public ClipsBinaryParser(InputStream inputStream) throws IOException {
-        parseBinaryClips(inputStream);
+    /**
+     * Charge les clips depuis un fichier.
+     * @param path chemin vers twolev.clips
+     */
+    public byte[] loadRaw(Path path) throws IOException {
+        return Files.readAllBytes(path);
     }
 
-    private void parseBinaryClips(InputStream inputStream) throws IOException {
-        byte[] data = inputStream.readAllBytes();
-        ByteBuffer buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
-
-        frameCount = buffer.getInt(); // Read frame count
-        frameWidth = buffer.getInt(); // Read frame width
-        frameHeight = buffer.getInt(); // Read frame height
-
-        frames = new BufferedImage[frameCount];
-        for (int i = 0; i < frameCount; i++) {
-            byte[] imgData = new byte[frameWidth * frameHeight * 4]; // Assuming 4 bytes per pixel
-            buffer.get(imgData); // Read image data
-            frames[i] = new BufferedImage(frameWidth, frameHeight, BufferedImage.TYPE_INT_ARGB);
-            frames[i].getRaster().setDataElements(0, 0, frameWidth, frameHeight, imgData);
-        }
-    }
-
-    public int getFrameCount() {
-        return frameCount;
-    }
-
-    public BufferedImage getFrame(int index) {
-        return frames[index];
+    /**
+     * Charge depuis un InputStream (classpath).
+     */
+    public byte[] loadRaw(InputStream is) throws IOException {
+        return is.readAllBytes();
     }
 }

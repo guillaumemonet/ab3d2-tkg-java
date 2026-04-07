@@ -1,61 +1,32 @@
 package com.ab3d2.core.level;
 
-import java.util.List;
-
+/**
+ * Métadonnées haut-niveau d'un niveau (nom, index, configuration).
+ * Distinct de {@link LevelData} qui contient la géométrie parsée.
+ *
+ * @see LevelData pour les données binaires complètes
+ */
 public class Level {
-    private String levelLetter;
-    private List<String> zones;
-    private String walkMap;
-    private String flyMap;
-    private int frameCount;
-    private String name;
 
-    // Getters and Setters
-    public String getLevelLetter() {
-        return levelLetter;
+    private final String id;      // "A"..."P"
+    private final int    index;   // 0...15
+    private LevelData    data;    // null tant que non chargé
+
+    public Level(String id, int index) {
+        this.id    = id;
+        this.index = index;
     }
 
-    public void setLevelLetter(String levelLetter) {
-        this.levelLetter = levelLetter;
-    }
+    public String    getId()    { return id; }
+    public int       getIndex() { return index; }
+    public LevelData getData()  { return data; }
 
-    public List<String> getZones() {
-        return zones;
-    }
+    public void setData(LevelData data) { this.data = data; }
 
-    public void setZones(List<String> zones) {
-        this.zones = zones;
-    }
+    public boolean isLoaded() { return data != null; }
 
-    public String getWalkMap() {
-        return walkMap;
-    }
-
-    public void setWalkMap(String walkMap) {
-        this.walkMap = walkMap;
-    }
-
-    public String getFlyMap() {
-        return flyMap;
-    }
-
-    public void setFlyMap(String flyMap) {
-        this.flyMap = flyMap;
-    }
-
-    public int getFrameCount() {
-        return frameCount;
-    }
-
-    public void setFrameCount(int frameCount) {
-        this.frameCount = frameCount;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
+    @Override
+    public String toString() {
+        return "Level{id=" + id + ", loaded=" + isLoaded() + "}";
     }
 }

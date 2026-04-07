@@ -1,19 +1,9 @@
 package com.ab3d2.core.level;
 
+/** Stub vide — les clips seront traités ultérieurement. */
 public class SpriteClip {
-    private int clipId;
-    private String name;
-    private int frameCount;
-
-    public SpriteClip(int id, String n, int count) {
-        clipId=id;
-        name=n;
-        frameCount=count;
+    public int x, y, w, h;
+    public SpriteClip(int x, int y, int w, int h) {
+        this.x = x; this.y = y; this.w = w; this.h = h;
     }
-
-    public int getClipId(){return clipId;}
-
-    public String getName(){return name;}
-
-    public int getFrameCount(){return frameCount;}
 }

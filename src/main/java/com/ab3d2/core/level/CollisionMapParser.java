@@ -1,30 +1,20 @@
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+package com.ab3d2.core.level;
 
+import java.io.IOException;
+import java.nio.file.Path;
+
+/**
+ * Stub — remplacé par {@link CollisionMap#load(Path)}.
+ * @deprecated Utiliser {@code CollisionMap.load(path)} directement.
+ */
+@Deprecated
 public class CollisionMapParser {
 
-    private static final int GRID_SIZE = 100;
-    private final boolean[][] collisionGrid = new boolean[GRID_SIZE][GRID_SIZE];
-
-    public CollisionMapParser(byte[] binaryData) {
-        parseCollisionMap(binaryData);
+    public static CollisionMap parse(byte[] data) {
+        return new CollisionMap(data);
     }
 
-    private void parseCollisionMap(byte[] binaryData) {
-        ByteBuffer buffer = ByteBuffer.wrap(binaryData);
-        buffer.order(ByteOrder.LITTLE_ENDIAN);
-
-        for (int i = 0; i < GRID_SIZE; i++) {
-            for (int j = 0; j < GRID_SIZE; j++) {
-                collisionGrid[i][j] = (buffer.get() != 0);
-            }
-        }
-    }
-
-    public boolean isCollision(int x, int y) {
-        if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
-            throw new IndexOutOfBoundsException("Coordinates out of bounds");
-        }
-        return collisionGrid[x][y];
+    public static CollisionMap load(Path path) throws IOException {
+        return CollisionMap.load(path);
     }
 }
