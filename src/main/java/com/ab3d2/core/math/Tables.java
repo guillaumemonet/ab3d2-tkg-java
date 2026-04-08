@@ -170,17 +170,19 @@ public class Tables {
     }
 
     /**
-     * Sinus en float (0..1 range), pour les calculs Java modernes.
+     * Sinus en float pour angle en [0..4095] (ANGLE_MAX=4096 = cercle complet).
+     * sinw() utilise (angle & 8190)>>1, donc on multiplie par 2 pour correspondre
+     * a l'espace angulaire 0..4095.
      */
     public static float sinf(int angle) {
-        return sinw(angle) / 32767.0f;
+        return sinw(angle * 2) / 32767.0f;
     }
 
     /**
-     * Cosinus en float.
+     * Cosinus en float pour angle en [0..4095].
      */
     public static float cosf(int angle) {
-        return cosw(angle) / 32767.0f;
+        return cosw(angle * 2) / 32767.0f;
     }
 
     // ── Accesseurs ConstantTable ─────────────────────────────────────────────

@@ -58,9 +58,9 @@ public class TextureIndexTest {
 
             for (WallRenderEntry[] ze : entries) {
                 for (WallRenderEntry e : ze) {
-                    if (e.isWall())   wallCount++;
-                    if (e.isFloor())  floorCount++;
-                    if (e.isObject()) objCount++;
+                    if (e.isWall())        wallCount++;
+                    if (e.isFloorRecord()) floorCount++;
+                    if (e.type == WallRenderEntry.TYPE_OBJECT) objCount++;
                 }
             }
 

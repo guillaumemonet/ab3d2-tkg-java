@@ -13,13 +13,6 @@ import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Écran de sélection de niveau (A → P).
- *
- * <h2>Contrôles</h2>
- * <pre>
- * ↑/↓  ou W/S/Z  — sélection
- * ENTER/SPACE     — lancer le niveau sélectionné
- * ESC             — retour au menu principal
- * </pre>
  */
 public class LevelSelectScreen implements Screen {
 
@@ -37,25 +30,21 @@ public class LevelSelectScreen implements Screen {
     private static final int NUM_LEVELS     = LEVEL_NAMES.length;
     private static final int ITEMS_PER_PAGE = 8;
 
-    // ── État ──────────────────────────────────────────────────────────────────
     private int       selectedIndex = 0;
     private int       scrollOffset  = 0;
     private float     fadeAlpha     = 0f;
     private float     fadeTarget    = 1f;
     private GameState pending       = null;
 
-    // ── GPU ───────────────────────────────────────────────────────────────────
     private int      screenTexId = -1;
     private int[]    screenBuf   = new int[GW * GH];
 
-    // ── Niveaux disponibles ───────────────────────────────────────────────────
     private boolean[] levelAvailable = new boolean[NUM_LEVELS];
 
     @Override
     public void init(GameContext ctx) {
         log.info("LevelSelectScreen init");
 
-        // Détecter les niveaux disponibles
         LevelManager mgr = new LevelManager(ctx.assets().getRoot());
         String[] available = mgr.listAvailableLevels();
         for (String lv : available) {
@@ -75,7 +64,6 @@ public class LevelSelectScreen implements Screen {
 
     @Override
     public GameState update(GameContext ctx, double dt) {
-        // Fade
         if (fadeAlpha < fadeTarget) fadeAlpha = Math.min(1f, fadeAlpha + (float)(dt * 3.0));
         else if (fadeAlpha > fadeTarget) fadeAlpha = Math.max(0f, fadeAlpha - (float)(dt * 3.0));
 
@@ -109,7 +97,6 @@ public class LevelSelectScreen implements Screen {
     @Override
     public void render(GameContext ctx, double alpha) {
         uploadFrame();
-
         var r = ctx.renderer();
         r.beginFrame();
         if (screenTexId >= 0) r.drawTexture(screenTexId, 0, 0, GW, GH);
@@ -123,43 +110,31 @@ public class LevelSelectScreen implements Screen {
         if (screenTexId >= 0) { glDeleteTextures(screenTexId); screenTexId = -1; }
     }
 
-    // ── Rendu software ───────────────────────────────────────────────────────
-
     private void renderFrame() {
         Arrays.fill(screenBuf, 0xFF080818);
-
-        // Titre
         drawText("SELECT LEVEL", 84, 10, 0xFFFFFF00);
         drawSeparator(20, 0xFF444444);
 
-        // Liste
         int y = 28;
         int end = Math.min(scrollOffset + ITEMS_PER_PAGE, NUM_LEVELS);
-
         for (int i = scrollOffset; i < end; i++) {
-            boolean sel = (i == selectedIndex);
+            boolean sel   = (i == selectedIndex);
             boolean avail = levelAvailable[i];
             int col = sel ? 0xFF00FF00 : (avail ? 0xFFCCCCCC : 0xFF555555);
-
-            if (sel) {
-                fillRect(0, y - 1, GW, 11, 0xFF111133);
-                drawText(">", 26, y, 0xFF00FF00);
-            }
+            if (sel) { fillRect(0, y - 1, GW, 11, 0xFF111133); drawText(">", 26, y, 0xFF00FF00); }
             drawText(LEVEL_NAMES[i], 38, y, col);
             if (!avail) drawText("[N/A]", 130, y, 0xFF883333);
             y += 18;
         }
 
-        // Footer
         drawSeparator(GH - 18, 0xFF444444);
         drawText("ENTER=PLAY    ESC=BACK", 28, GH - 14, 0xFF666666);
 
-        // Scrollbar
         if (NUM_LEVELS > ITEMS_PER_PAGE) {
-            int totalH  = ITEMS_PER_PAGE * 18;
-            int barH    = Math.max(4, totalH * ITEMS_PER_PAGE / NUM_LEVELS);
+            int totalH = ITEMS_PER_PAGE * 18;
+            int barH   = Math.max(4, totalH * ITEMS_PER_PAGE / NUM_LEVELS);
             int maxScrl = NUM_LEVELS - ITEMS_PER_PAGE;
-            int barY    = 28 + (totalH - barH) * scrollOffset / Math.max(1, maxScrl);
+            int barY   = 28 + (totalH - barH) * scrollOffset / Math.max(1, maxScrl);
             fillRect(GW - 5, 28, 3, totalH, 0xFF222222);
             fillRect(GW - 5, barY, 3, barH,  0xFF555555);
         }
@@ -184,14 +159,9 @@ public class LevelSelectScreen implements Screen {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    // ── Police 5×7 ───────────────────────────────────────────────────────────
-
     private void drawText(String text, int x, int y, int col) {
         int cx = x;
-        for (char c : text.toUpperCase().toCharArray()) {
-            drawChar5x7(c, cx, y, col);
-            cx += 6;
-        }
+        for (char c : text.toUpperCase().toCharArray()) { drawChar5x7(c, cx, y, col); cx += 6; }
     }
 
     private void drawChar5x7(char c, int x, int y, int col) {

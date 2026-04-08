@@ -1,5 +1,6 @@
 package com.ab3d2.game;
 
+import com.ab3d2.assets.FloorTextureLoader;
 import com.ab3d2.assets.WallTextureManager;
 import com.ab3d2.core.*;
 import com.ab3d2.core.level.*;
@@ -20,57 +21,43 @@ import static org.lwjgl.opengl.GL33.*;
 
 /**
  * Ecran de jeu principal — renderer 3D texturé.
- *
- * <h2>Controles</h2>
- * <pre>
- * W/Z     — avancer          S     — reculer
- * A/Q     — tourner gauche   D     — tourner droite
- * E       — strafe droite
- * Shift   — sprint
- * ESC     — retour menu
- * M/Tab   — basculer top-down/3D
- * F1      — basculer wireframe/texturé
- * </pre>
  */
 public class InGameScreen implements Screen {
 
     private static final Logger log = LoggerFactory.getLogger(InGameScreen.class);
 
-    private static final int GW3D = Camera.SCREEN_W;    // 192
-    private static final int GH3D = Camera.SCREEN_H;    // 160
-    private static final int GW   = Window.GAME_WIDTH;  // 320
-    private static final int GH   = Window.GAME_HEIGHT; // 200
+    private static final int GW3D = Camera.SCREEN_W;
+    private static final int GH3D = Camera.SCREEN_H;
+    private static final int GW   = Window.GAME_WIDTH;
+    private static final int GH   = Window.GAME_HEIGHT;
 
     private static final float MOVE_SPEED  = 64.0f;
     private static final float SPRINT_MULT = 3.0f;
     private static final int   TURN_SPEED  = 32;
 
-    // ── Etat ─────────────────────────────────────────────────────────────────
     private final int           levelIndex;
     private LevelData           level;
     private WallRenderEntry[][] zoneEntries;
+    private int[]               floorWhichTiles;
+    private int[]               ceilWhichTiles;
     private PlayerState         player;
 
-    // ── Renderers ────────────────────────────────────────────────────────────
     private TexturedRenderer3D renderer3D;
     private WireRenderer3D     rendererWire;
     private TopDownRenderer    topDown;
     private boolean            showTopDown   = false;
-    private boolean            showWireframe = false;  // F1 pour debug
+    private boolean            showWireframe = false;
+    private FloorTextureLoader floorLoader;
 
-    // ── GPU ───────────────────────────────────────────────────────────────────
     private int tex3DId  = -1;
     private int texTopId = -1;
 
     public InGameScreen(int levelIndex) { this.levelIndex = levelIndex; }
 
-    // ── Cycle de vie ──────────────────────────────────────────────────────────
-
     @Override
     public void init(GameContext ctx) {
         log.info("InGameScreen init — level index {}", levelIndex);
 
-        // Tables maths
         if (!Tables.isInitialized()) {
             try { Tables.initFromClasspath(); }
             catch (Exception e) {
@@ -79,7 +66,6 @@ public class InGameScreen implements Screen {
             }
         }
 
-        // Chargement du niveau
         String letter = String.valueOf((char)('A' + levelIndex));
         try {
             level = new com.ab3d2.LevelManager(ctx.assets().getRoot()).load(letter);
@@ -89,7 +75,6 @@ public class InGameScreen implements Screen {
             level = null;
         }
 
-        // ZoneGraphAdds (murs texturés)
         if (level != null) {
             try {
                 Path graphPath = ctx.assets().getRoot()
@@ -99,6 +84,8 @@ public class InGameScreen implements Screen {
                 gBuf.getInt(); gBuf.getInt(); gBuf.getInt();
                 int zgaOffset = gBuf.getInt();
                 zoneEntries = new ZoneGraphParser().parse(graphRaw, level.numZones(), zgaOffset);
+                floorWhichTiles = ZoneGraphParser.extractFloorWhichTiles(zoneEntries);
+                ceilWhichTiles  = ZoneGraphParser.extractCeilWhichTiles(zoneEntries);
                 int totalWalls = 0;
                 for (WallRenderEntry[] ze : zoneEntries)
                     for (WallRenderEntry e : ze) if (e.isWall()) totalWalls++;
@@ -111,7 +98,6 @@ public class InGameScreen implements Screen {
             }
         }
 
-        // Positionner le joueur
         if (level != null) {
             ZoneData startZone = level.zone(level.plr1StartZoneId);
             float eyeH = (startZone != null)
@@ -120,28 +106,30 @@ public class InGameScreen implements Screen {
             player = new PlayerState(level.plr1StartX, level.plr1StartZ, 0,
                                      (short) level.plr1StartZoneId);
             player.yOff = (int)(eyeH * 256);
-            log.info("Joueur : ({},{}) zone={} eyeH={}",
-                level.plr1StartX, level.plr1StartZ, level.plr1StartZoneId, eyeH);
         } else {
             player = new PlayerState();
         }
 
-        // Textures murs (palette deja chargee depuis 256pal.bin par AssetManager)
         WallTextureManager texMgr = new WallTextureManager();
         try {
             Path wallsDir = ctx.assets().getRoot().resolve("walls");
             texMgr.loadAll(wallsDir, ctx.assets().getPalette());
-            log.info(texMgr.dump());
         } catch (Exception e) {
             log.error("Erreur chargement textures murs : {}", e.getMessage());
         }
 
-        // Renderers
-        renderer3D   = new TexturedRenderer3D(GW3D, GH3D, texMgr);
+        floorLoader = new FloorTextureLoader();
+        try {
+            Path floorsDir = ctx.assets().getRoot().resolve("floors");
+            floorLoader.load(floorsDir, ctx.assets().getPalette());
+        } catch (Exception e) {
+            log.warn("FloorTextureLoader erreur : {}", e.getMessage());
+        }
+
+        renderer3D   = new TexturedRenderer3D(GW3D, GH3D, texMgr, floorLoader);
         rendererWire = new WireRenderer3D(GW3D, GH3D);
         topDown      = new TopDownRenderer(GW, GH);
 
-        // Premiere frame
         renderFrame();
         tex3DId  = ctx.assets().createTextureFromARGB(upscale3D(currentPixels()), GW, GH);
         topDown.update(level, player);
@@ -165,27 +153,19 @@ public class InGameScreen implements Screen {
 
         if (in.isKeyHeld(GLFW.GLFW_KEY_W) || in.isKeyHeld(GLFW.GLFW_KEY_Z))
             player.moveForward(speed);
-        if (in.isKeyHeld(GLFW.GLFW_KEY_S))
-            player.moveForward(-speed);
-        if (in.isKeyHeld(GLFW.GLFW_KEY_Q))
-            player.moveStrafe(-speed);
-        if (in.isKeyHeld(GLFW.GLFW_KEY_E))
-            player.moveStrafe(speed);
-
-        if (in.isKeyHeld(GLFW.GLFW_KEY_A))
-            player.rotate(-TURN_SPEED);
-        if (in.isKeyHeld(GLFW.GLFW_KEY_D))
-            player.rotate(TURN_SPEED);
+        if (in.isKeyHeld(GLFW.GLFW_KEY_S))  player.moveForward(-speed);
+        if (in.isKeyHeld(GLFW.GLFW_KEY_Q))  player.moveStrafe(-speed);
+        if (in.isKeyHeld(GLFW.GLFW_KEY_E))  player.moveStrafe(speed);
+        if (in.isKeyHeld(GLFW.GLFW_KEY_A))  player.rotate(-TURN_SPEED);
+        if (in.isKeyHeld(GLFW.GLFW_KEY_D))  player.rotate(TURN_SPEED);
 
         double mdx = in.getMouseDX();
         if (Math.abs(mdx) > 0.5) player.rotate((int)(mdx * 2.0));
 
-        // Zone traversal
         int newZone = ZoneTraversal.updateZone(level,
             player.currentZoneId & 0xFFFF,
             player.worldX(), player.worldZ());
         if (newZone != (player.currentZoneId & 0xFFFF)) {
-            log.debug("Zone : {} -> {}", player.currentZoneId & 0xFFFF, newZone);
             player.currentZoneId = (short) newZone;
             ZoneData zd = level.zone(newZone);
             if (zd != null)
@@ -208,25 +188,30 @@ public class InGameScreen implements Screen {
         log.info("InGameScreen destroyed");
     }
 
-    // ── Rendu ─────────────────────────────────────────────────────────────────
-
     private void renderFrame() {
-        if (level == null) return;
-        float eyeH = (float) player.yOff / 256.0f;
-        Camera cam = new Camera(player.worldX(), player.worldZ(), eyeH, player.angle);
-
-        if (showTopDown) {
-            topDown.update(level, player);
-        } else if (showWireframe) {
-            rendererWire.render(level, cam, player.currentZoneId & 0xFFFF);
-        } else {
-            renderer3D.render(level, zoneEntries, cam, player.currentZoneId & 0xFFFF);
+        if (level == null || zoneEntries == null) {
+            java.util.Arrays.fill(renderer3D.getPixels(), 0xFFFF0000);
+            return;
+        }
+        try {
+            float eyeH = (float) player.yOff / 256.0f;
+            Camera cam = new Camera(player.worldX(), player.worldZ(), eyeH, player.angle);
+            if (showTopDown) {
+                topDown.update(level, player);
+            } else if (showWireframe) {
+                rendererWire.render(level, cam, player.currentZoneId & 0xFFFF);
+            } else {
+                renderer3D.render(level, zoneEntries, cam, player.currentZoneId & 0xFFFF,
+                    floorWhichTiles, ceilWhichTiles);
+            }
+        } catch (Exception ex) {
+            log.error("renderFrame EXCEPTION : {}", ex.getMessage(), ex);
+            java.util.Arrays.fill(renderer3D.getPixels(), 0xFFFF00FF);
         }
     }
 
     private int[] currentPixels() {
-        if (showWireframe) return rendererWire.getPixels();
-        return renderer3D.getPixels();
+        return showWireframe ? rendererWire.getPixels() : renderer3D.getPixels();
     }
 
     private void uploadAndDraw(GameContext ctx) {
@@ -242,8 +227,6 @@ public class InGameScreen implements Screen {
         r.endFrame(ctx.window().getWidth(), ctx.window().getHeight(),
                    ctx.window().getViewportRect());
     }
-
-    // ── Upscale 192x160 → 320x200 ────────────────────────────────────────────
 
     private int[] upscale3D(int[] src) {
         int[] dst = new int[GW * GH];

@@ -1,5 +1,6 @@
 package com.ab3d2.render;
 
+import com.ab3d2.assets.FloorTextureLoader;
 import com.ab3d2.assets.WadTextureData;
 import com.ab3d2.assets.WallTextureManager;
 import com.ab3d2.core.level.*;
@@ -7,96 +8,156 @@ import com.ab3d2.core.level.*;
 import java.util.Arrays;
 
 /**
- * Renderer 3D software avec textures de murs (colonne par colonne).
+ * Renderer 3D software : murs textures + sol/plafond perspective-correct.
  *
- * <h2>Algorithme de rendu par colonne</h2>
- * Pour chaque mur visible (depuis la zone courante + PVS) :
- * <ol>
- *   <li>Projeter les deux extremites en espace ecran (sx1, sx2)</li>
- *   <li>Pour chaque colonne x entre sx1 et sx2 :</li>
- *   <li>  Calculer la profondeur perspective-correcte cam_z(x)</li>
- *   <li>  Calculer la coordonnee texture U (horizontal)</li>
- *   <li>  Projeter les hauteurs top/bottom en screen y</li>
- *   <li>  Pour chaque pixel y de screenTop a screenBot :</li>
- *   <li>    Calculer V (vertical), echantillonner la texture, ecrire le pixel</li>
- * </ol>
- *
- * <h2>Echelle des textures (depuis le README)</h2>
- * <pre>
- * Horizontale : 256 unites monde = 1 largeur texture complete
- * Verticale   : 128 unites monde = 1 hauteur texture complete
- * </pre>
- *
- * <h2>Coordonnees ecran</h2>
- * <pre>
- * Largeur : 192  Centre X = 96
- * Hauteur : 160  Centre Y = 80
- * FOCAL   =  96  (FOV horizontal 90°)
- * </pre>
+ * <h2>Floor casting</h2>
+ * Pour chaque ligne y, on calcule la distance au plan horizontal :
+ *   dist = (planeH - eyeH) * FOCAL / (y - centreY)
+ * Puis pour chaque pixel x de cette ligne, la position monde :
+ *   wx = cam.x + dist*sin + (x-centreX) * dist*cos/FOCAL
+ *   wz = cam.z + dist*cos - (x-centreX) * dist*sin/FOCAL
+ * et on sample la texture de sol (tile 64x64) avec texU=wx%64, texV=wz%64.
  */
 public class TexturedRenderer3D {
 
-    // ── Constantes echelle texture (README) ───────────────────────────────────
-    /**
-     * 256 unites monde pour une repetition complete horizontale.
-     * texU = (worldOffset / TEX_SCALE_H) & widthMask
-     */
     private static final float TEX_SCALE_H = 256.0f;
 
-    /**
-     * 128 unites monde pour une repetition complete verticale.
-     * texV = (heightOffset / TEX_SCALE_V) & heightMask
-     */
-    private static final float TEX_SCALE_V = 128.0f;
+    // Hauteurs monde par tile (GLFT WallHeights confirme)
+    private static final float[] GLFT_TEX_HEIGHTS = {
+         64,  // 0  stonewall
+        128,  // 1  brownpipes
+        128,  // 2  hullmetal
+        128,  // 3  technotritile
+        128,  // 4  brownspeakers
+        128,  // 5  chevrondoor
+        128,  // 6  technolights
+        128,  // 7  redhullmetal
+        128,  // 8  alienredwall
+        128,  // 9  gieger
+        128,  // 10 rocky
+        128,  // 11 steampunk
+         32,  // 12 brownstonestep
+    };
 
-    // ── Taille ecran ──────────────────────────────────────────────────────────
-    private final int   W;
-    private final int   H;
+    private final int   W, H;
     private final int[] pixels;
-    private final float[] depthBuf; // z-buffer de profondeur (cam_z par colonne)
+    private final float[] depthBuf;   // Z-buffer 2D par pixel
 
-    // ── Dependances ───────────────────────────────────────────────────────────
     private final WallTextureManager texMgr;
+    private final FloorTextureLoader floorLoader;
 
-    // ── Constructeur ──────────────────────────────────────────────────────────
-
-    public TexturedRenderer3D(int w, int h, WallTextureManager texMgr) {
-        this.W      = w;
-        this.H      = h;
-        this.pixels  = new int[w * h];
-        this.depthBuf = new float[w];
-        this.texMgr  = texMgr;
+    public TexturedRenderer3D(int w, int h, WallTextureManager texMgr,
+                               FloorTextureLoader floorLoader) {
+        this.W           = w;
+        this.H           = h;
+        this.pixels      = new int[w * h];
+        this.depthBuf    = new float[w * h];
+        this.texMgr      = texMgr;
+        this.floorLoader = floorLoader;
     }
 
     // ── Rendu principal ───────────────────────────────────────────────────────
 
-    /**
-     * Dessine une frame complete.
-     *
-     * @param level          donnees du niveau
-     * @param zoneEntries    WallRenderEntry[][] parse de ZoneGraphAdds (par zone_id)
-     * @param camera         camera (position, angle, eyeH)
-     * @param zoneId         zone courante du joueur
-     */
     public void render(LevelData level, WallRenderEntry[][] zoneEntries,
-                       Camera camera, int zoneId) {
-        // Fond
-        Arrays.fill(pixels, 0xFF1A1A2E);             // plafond
-        for (int y = H / 2; y < H; y++)
-            Arrays.fill(pixels, y * W, y * W + W, 0xFF0D0D1F);  // sol
+                       Camera camera, int zoneId, int[] floorWhichTiles, int[] ceilWhichTiles) {
 
-        // Z-buffer : infinity
         Arrays.fill(depthBuf, Float.MAX_VALUE);
+        Arrays.fill(pixels, 0xFF000000);
 
-        // Dessiner la zone courante d'abord
-        drawZone(level, zoneEntries, camera, zoneId);
-
-        // Puis les zones PVS
         ZoneData curZone = level.zone(zoneId);
+        float floorH  = curZone != null ? curZone.floorHeight()  : 0;
+        float ceilH   = curZone != null ? curZone.roofHeight()   : floorH - 128;
+
+        int floorTile = (floorWhichTiles != null && zoneId < floorWhichTiles.length
+                         && floorWhichTiles[zoneId] >= 0)
+                        ? floorWhichTiles[zoneId]
+                        : (curZone != null ? (curZone.floorNoise & 0xFF) : 0);
+        int ceilTile  = (ceilWhichTiles != null && zoneId < ceilWhichTiles.length
+                         && ceilWhichTiles[zoneId] >= 0)
+                        ? ceilWhichTiles[zoneId]
+                        : floorTile;
+
+        // Rendre d'abord les sols/plafonds de TOUTES les zones visibles
+        // du plus loin au plus proche (le depthBuf gere l'occlusion correcte)
+        // Zones PVS en premier (generalement plus loin)
         if (curZone != null) {
             for (ZPVSRecord pvs : curZone.pvsRecords) {
                 int vid = pvs.zoneId() & 0xFFFF;
-                if (vid != zoneId) drawZone(level, zoneEntries, camera, vid);
+                if (vid == zoneId || vid >= level.numZones()) continue;
+                ZoneData pvsZone = level.zone(vid);
+                if (pvsZone == null) continue;
+                float pFloor = pvsZone.floorHeight();
+                float pCeil  = pvsZone.roofHeight();
+                int pFT = (floorWhichTiles != null && vid < floorWhichTiles.length
+                           && floorWhichTiles[vid] >= 0)
+                          ? floorWhichTiles[vid] : floorTile;
+                int pCT = (ceilWhichTiles != null && vid < ceilWhichTiles.length
+                           && ceilWhichTiles[vid] >= 0)
+                          ? ceilWhichTiles[vid] : ceilTile;
+                renderFloorCeiling(camera, pFloor, pCeil, pFT, pCT);
+            }
+        }
+        // Zone courante en dernier (plus proche = ecrase les zones lointaines)
+        renderFloorCeiling(camera, floorH, ceilH, floorTile, ceilTile);
+
+        drawZone(level, zoneEntries, camera, zoneId);
+        if (curZone != null) {
+            for (ZPVSRecord pvs : curZone.pvsRecords) {
+                int vid = pvs.zoneId() & 0xFFFF;
+                if (vid != zoneId && vid < level.numZones())
+                    drawZone(level, zoneEntries, camera, vid);
+            }
+        }
+    }
+
+    // ── Sol et plafond (floor casting perspective-correct) ────────────────────
+
+    private void renderFloorCeiling(Camera cam, float floorH, float ceilH,
+                                      int floorWhichTile, int ceilWhichTile) {
+        final float sinV  = cam.getSin();
+        final float cosV  = cam.getCos();
+        final float focal = Camera.FOCAL;
+        final float centX = Camera.CENTRE_X;
+        final float centY = Camera.CENTRE_Y;
+
+        int[] floorTile = floorLoader.getTile(floorWhichTile);
+        int[] ceilTile  = floorLoader.getTile(ceilWhichTile);
+        final int TW = FloorTextureLoader.TILE_W;
+        final int TH = FloorTextureLoader.TILE_H;
+
+        for (int y = 0; y < H; y++) {
+            float dY = y - centY;
+            if (dY == 0f) continue;
+            boolean isFloor = dY > 0;
+            float   planeH  = isFloor ? floorH : ceilH;
+            float   dist    = (planeH - cam.eyeH) * focal / dY;
+            if (dist <= 0f) continue;
+
+            float stepX =  dist * cosV / focal;
+            float stepZ = -dist * sinV / focal;
+            float wx = cam.x + dist * sinV + (0 - centX) * stepX;
+            float wz = cam.z + dist * cosV + (0 - centX) * stepZ;
+
+            int[] tile = isFloor ? floorTile : ceilTile;
+            float fog  = Math.max(0f, Math.min(1f, 1f - (dist - 50f) / 1200f));
+            if (!isFloor) fog *= 0.75f;
+
+            int rowOff = y * W;
+            for (int x = 0; x < W; x++) {
+                int idx = rowOff + x;
+                // Z-buffer : n'ecrire que si ce pixel est vide ou plus loin
+                if (dist < depthBuf[idx]) {
+                    depthBuf[idx] = dist;
+                    int texU = Math.floorMod((int) wx, TW);
+                    int texV = Math.floorMod((int) wz, TH);
+                    int raw  = tile[texV * TW + texU];
+                    int r = (int)(((raw >> 16) & 0xFF) * fog);
+                    int g = (int)(((raw >>  8) & 0xFF) * fog);
+                    int b = (int)(( raw        & 0xFF) * fog);
+                    pixels[idx] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                }
+                wx += stepX;
+                wz += stepZ;
             }
         }
     }
@@ -107,171 +168,133 @@ public class TexturedRenderer3D {
                           Camera camera, int zoneId) {
         if (zoneId < 0 || zoneId >= zoneEntries.length) return;
         WallRenderEntry[] entries = zoneEntries[zoneId];
-        if (entries == null || entries.length == 0) return;
+        if (entries == null) return;
 
         for (WallRenderEntry entry : entries) {
             if (!entry.isWall()) continue;
+            if ((entry.texIndex & 0x8000) != 0) continue;
+            if (entry.texIndex >= WallTextureManager.NUM_WALL_TEXTURES) continue;
 
-            // tex_index >= 16 = portail/transparent : jamais rendu dans l'original
-            // (index negatif dans Draw_WallTexturePtrs_vl en M68k signe)
-            if (entry.texIndex < 0 || entry.texIndex >= WallTextureManager.NUM_WALL_TEXTURES) continue;
+            int li = entry.leftPt  & 0xFFFF;
+            int ri = entry.rightPt & 0xFFFF;
+            if (li >= level.numPoints() || ri >= level.numPoints()) continue;
 
-            // Recuperer les points 2D des extremites du mur
-            int leftIdx  = entry.leftPt  & 0xFFFF;
-            int rightIdx = entry.rightPt & 0xFFFF;
-            if (leftIdx  >= level.numPoints()) continue;
-            if (rightIdx >= level.numPoints()) continue;
+            Vec2W lp = level.point(li), rp = level.point(ri);
+            if (lp == null || rp == null) continue;
 
-            Vec2W leftPt  = level.point(leftIdx);
-            Vec2W rightPt = level.point(rightIdx);
-            if (leftPt == null || rightPt == null) continue;
+            float topH = entry.topWall / 256.0f;
+            float botH = entry.botWall / 256.0f;
+            if (topH >= botH) continue;
+            float wh = botH - topH;
+            if (wh > 2048f || Math.abs(topH) > 8192f) continue;
 
-            // Hauteurs du mur (raw → height units)
-            float topH = (float) entry.topWall   / 256.0f;
-            float botH = (float) entry.botWall   / 256.0f;
-            if (topH >= botH) continue;  // mur sans hauteur
-
-            // Texture
             WadTextureData tex = texMgr.get(entry.texIndex);
+            if (tex == null) continue;
 
-            drawWall(camera, leftPt, rightPt, topH, botH, entry, tex);
+            drawWall(camera, lp, rp, topH, botH, entry, tex);
         }
     }
 
-    // ── Rendu d'un mur texturé entre deux points ──────────────────────────────
+    // ── Rendu d'un mur texturé ────────────────────────────────────────────────
 
     private void drawWall(Camera camera, Vec2W left, Vec2W right,
                           float topH, float botH,
                           WallRenderEntry entry, WadTextureData tex) {
 
-        float wx1 = left.xi(),  wz1 = left.zi();
+        float wx1 = left.xi(), wz1 = left.zi();
         float wx2 = right.xi(), wz2 = right.zi();
 
-        // Transform camera space
-        float cx1 = camera.camX(wx1, wz1), cz1 = camera.camZ(wx1, wz1);
-        float cx2 = camera.camX(wx2, wz2), cz2 = camera.camZ(wx2, wz2);
-
-        // Rejeter si les deux points sont derriere
+        float cx1 = camera.camX(wx1,wz1), cz1 = camera.camZ(wx1,wz1);
+        float cx2 = camera.camX(wx2,wz2), cz2 = camera.camZ(wx2,wz2);
         if (cz1 <= Camera.NEAR_Z && cz2 <= Camera.NEAR_Z) return;
 
-        // Near-plane clipping
-        if (cz1 <= Camera.NEAR_Z) { float[] c = clipNear(cx1, cz1, cx2, cz2); cx1=c[0]; cz1=c[1]; }
-        else if (cz2 <= Camera.NEAR_Z) { float[] c = clipNear(cx2, cz2, cx1, cz1); cx2=c[0]; cz2=c[1]; }
+        float dx = wx2-wx1, dz = wz2-wz1;
+        float wallLen = (float)Math.sqrt(dx*dx + dz*dz);
+        int texW = Math.max(1, tex.width());
+        int texH = Math.max(1, tex.height());
 
-        // Projeter les X ecran
-        float sx1 = Camera.projectX(cx1, cz1);
-        float sx2 = Camera.projectX(cx2, cz2);
-        if (sx1 > sx2) {
-            // Swap pour toujours aller gauche → droite
-            float t; t=sx1; sx1=sx2; sx2=t; t=cx1; cx1=cx2; cx2=t; t=cz1; cz1=cz2; cz2=t;
-            t=wx1; wx1=wx2; wx2=t; t=wz1; wz1=wz2; wz2=t;
+        float texOffX = (entry.fromTile & 0xFFFF) < 32768
+            ? (entry.fromTile & 0xFFFF) / 16.0f : 0.0f;
+        float texOffY = (entry.yOffset & 0xFFFF) < 32768
+            ? (entry.yOffset & 0xFFFF) / 256.0f : 0.0f;
+
+        float u1 = texOffX, u2 = texOffX + wallLen / TEX_SCALE_H * texW;
+
+        // Near-plane
+        if (cz1 <= Camera.NEAR_Z) {
+            float a=(Camera.NEAR_Z-cz1)/(cz2-cz1);
+            cx1+=a*(cx2-cx1); cz1=Camera.NEAR_Z; u1+=a*(u2-u1);
+        } else if (cz2 <= Camera.NEAR_Z) {
+            float a=(Camera.NEAR_Z-cz2)/(cz1-cz2);
+            cx2+=a*(cx1-cx2); cz2=Camera.NEAR_Z; u2+=a*(u1-u2);
         }
 
-        // Rejeter si completement hors ecran
-        if (sx2 < 0 || sx1 >= W) return;
+        // Frustum L/R
+        float sL1=cx1+cz1, sL2=cx2+cz2;
+        float sR1=cz1-cx1, sR2=cz2-cx2;
+        if (sL1<0&&sL2<0) return;
+        if (sR1<0&&sR2<0) return;
+        if (sL1<0){float a=sL1/(sL1-sL2);cx1+=a*(cx2-cx1);cz1+=a*(cz2-cz1);u1+=a*(u2-u1);}
+        else if(sL2<0){float a=sL2/(sL2-sL1);cx2+=a*(cx1-cx2);cz2+=a*(cz1-cz2);u2+=a*(u1-u2);}
+        sR1=cz1-cx1; sR2=cz2-cx2;
+        if (sR1<0){float a=sR1/(sR1-sR2);cx1+=a*(cx2-cx1);cz1+=a*(cz2-cz1);u1+=a*(u2-u1);}
+        else if(sR2<0){float a=sR2/(sR2-sR1);cx2+=a*(cx1-cx2);cz2+=a*(cz1-cz2);u2+=a*(u1-u2);}
+        if (cz1<=0||cz2<=0) return;
 
-        int xStart = Math.max(0, (int) sx1);
-        int xEnd   = Math.min(W - 1, (int) sx2);
-        if (xStart > xEnd) return;
+        float sx1 = Camera.projectX(cx1,cz1);
+        float sx2 = Camera.projectX(cx2,cz2);
+        if (sx1>=sx2||sx2<0||sx1>=W) return;
 
-        // Longueur du mur en unites monde (pour le mapping U)
-        float wallLenX = wx2 - wx1;
-        float wallLenZ = wz2 - wz1;
-        float wallLenWorld = (float) Math.sqrt(wallLenX * wallLenX + wallLenZ * wallLenZ);
+        int xStart=Math.max(0,(int)sx1), xEnd=Math.min(W-1,(int)sx2);
+        if (xStart>xEnd) return;
 
-        // Texture
-        int texW = tex.width();
-        int texH = tex.height();
-        int wMask = texW - 1;
-        int hMask = texH - 1;
+        float invZ1=1f/cz1, invZ2=1f/cz2;
+        float uoz1=u1*invZ1, uoz2=u2*invZ2;
+        float span=Math.max(0.5f,sx2-sx1);
 
-        // Offset texture depuis l'entree
-        // fromTile peut etre un WORD signe : masquer a 16 bits puis diviser
-        float texOffX = (entry.fromTile & 0xFFFF) < 32768
-            ? (entry.fromTile & 0xFFFF) / 16.0f
-            : 0.0f;
-        // yOffset idem : valeurs negatives (0xFF..) = pas d'offset vertical
-        float texOffY = (entry.yOffset & 0xFFFF) < 32768
-            ? (entry.yOffset & 0xFFFF) / 256.0f
-            : 0.0f;
+        float worldScale=(entry.texIndex>=0&&entry.texIndex<GLFT_TEX_HEIGHTS.length)
+            ?GLFT_TEX_HEIGHTS[entry.texIndex]:128f;
+        float wallWorldH=botH-topH;
+        int[] tp=tex.pixels();
 
-        // Facteur de repetition horizontal : 1 repetition = TEX_SCALE_H monde
-        // texU avance de (wallLenWorld / TEX_SCALE_H * texW) sur toute la largeur
-        float totalU = wallLenWorld / TEX_SCALE_H * texW;
+        for (int col=xStart;col<=xEnd;col++) {
+            float t=    (col-sx1)/span;
+            float invZ= invZ1+t*(invZ2-invZ1);
+            if (invZ<=0) continue;
+            float cz=1f/invZ;
 
-        // Interpolation perspective-correcte : on travaille avec 1/z
-        float invZ1 = 1.0f / cz1;
-        float invZ2 = 1.0f / cz2;
-        float totalSX = sx2 - sx1;
-        if (Math.abs(totalSX) < 0.5f) totalSX = 0.5f;
+            float u=(uoz1+t*(uoz2-uoz1))*cz;
+            int texU=Math.floorMod((int)u,texW);
 
-        for (int col = xStart; col <= xEnd; col++) {
-            float t = (col - sx1) / totalSX;  // 0..1 le long du mur
+            float sTop=Camera.projectY(topH,camera.eyeH,cz);
+            float sBot=Camera.projectY(botH,camera.eyeH,cz);
+            int yTop=Camera.clampY(sTop), yBot=Camera.clampY(sBot);
+            if (yTop>=yBot) continue;
 
-            // Profondeur perspective-correcte
-            float invZ = invZ1 + t * (invZ2 - invZ1);
-            float cz   = 1.0f / invZ;
+            float pixH=sBot-sTop;
+            if (pixH<0.5f) continue;
+            float vScale=wallWorldH*texH/(pixH*worldScale);
 
-            // Z-buffer : ne dessiner que si plus proche
-            if (cz >= depthBuf[col]) continue;
-            depthBuf[col] = cz;
-
-            // Coordonnee U — modulo positif obligatoire (Java % peut retourner negatif)
-            float u = t * totalU + texOffX;
-            int texU = Math.floorMod((int) u, Math.max(1, texW));
-
-            // Projeter les hauteurs du mur a cette profondeur
-            float screenTop = Camera.projectY(topH, camera.eyeH, cz);
-            float screenBot = Camera.projectY(botH, camera.eyeH, cz);
-
-            int yTop = Camera.clampY(screenTop);
-            int yBot = Camera.clampY(screenBot);
-            if (yTop >= yBot) continue;
-
-            // Hauteur en pixels du mur a cette profondeur
-            float wallPixelH = screenBot - screenTop;
-            if (wallPixelH < 0.5f) continue;
-
-            // Echelle V : TEX_SCALE_V unites monde = 1 texture hauteur
-            // wallHeightWorld = (botH - topH) unites monde
-            float wallHeightWorld = botH - topH;
-            float texVscale = texH / (wallPixelH);  // texels par pixel
-
-            // Dessiner la colonne
-            int[] tpixels = tex.pixels();
-            int safeTexW = Math.max(1, texW);
-            int safeTexH = Math.max(1, texH);
-            for (int row = yTop; row < yBot; row++) {
-                float dy  = row - screenTop;
-                float v   = dy * texVscale + texOffY;
-                // Math.floorMod garantit un resultat positif meme si v < 0
-                int texV  = Math.floorMod((int) v, safeTexH);
-                int texPx = tpixels[texV * safeTexW + texU];
-                pixels[row * W + col] = fogColor(texPx, cz);
+            for (int row=yTop;row<yBot;row++) {
+                int idx=row*W+col;
+                if (cz>=depthBuf[idx]) continue;
+                depthBuf[idx]=cz;
+                float v=(row-sTop)*vScale+texOffY;
+                int texV=Math.floorMod((int)v,texH);
+                pixels[idx]=fogColor(tp[texV*texW+texU],cz);
             }
         }
     }
 
-    // ── Near-plane clipping ───────────────────────────────────────────────────
-
-    private static float[] clipNear(float cx1, float cz1, float cx2, float cz2) {
-        float t = (Camera.NEAR_Z - cz1) / (cz2 - cz1);
-        return new float[]{ cx1 + t * (cx2 - cx1), Camera.NEAR_Z };
-    }
-
-    // ── Fog de distance ───────────────────────────────────────────────────────
-
     private static int fogColor(int color, float depth) {
-        float fog = Math.max(0f, Math.min(1f, 1f - depth / 500f));
-        int r = (int)(((color >> 16) & 0xFF) * fog);
-        int g = (int)(((color >>  8) & 0xFF) * fog);
-        int b = (int)(( color        & 0xFF) * fog);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+        float fog=Math.max(0f,Math.min(1f,1f-(depth-50f)/1200f));
+        int r=(int)(((color>>16)&0xFF)*fog);
+        int g=(int)(((color>> 8)&0xFF)*fog);
+        int b=(int)(( color    &0xFF)*fog);
+        return 0xFF000000|(r<<16)|(g<<8)|b;
     }
 
-    // ── Accesseurs ────────────────────────────────────────────────────────────
-
-    public int[] getPixels() { return pixels; }
-    public int   getWidth()  { return W; }
-    public int   getHeight() { return H; }
+    public int[]  getPixels() { return pixels; }
+    public int    getWidth()  { return W; }
+    public int    getHeight() { return H; }
 }

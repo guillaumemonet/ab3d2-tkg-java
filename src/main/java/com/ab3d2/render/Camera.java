@@ -70,7 +70,9 @@ public class Camera {
     }
 
     public void setAngle(int angle) {
-        this.angle  = angle & 8191;  // ANGLE_MAX = 8192
+        // ANGLE_MAX = 4096 = cercle complet (README).
+        // sinf/cosf(a) = sinw(a*2)/32767 -> angle*2 adresse la table 8192 entrees.
+        this.angle  = angle & 4095;
         this.sinVal = Tables.sinf(this.angle);
         this.cosVal = Tables.cosf(this.angle);
     }
@@ -145,6 +147,11 @@ public class Camera {
     public static int clampY(float sy) {
         return Math.max(0, Math.min(SCREEN_H - 1, (int) sy));
     }
+
+    /** Sine de l'angle (accessible pour le floor casting). */
+    public float getSin() { return sinVal; }
+    /** Cosine de l'angle (accessible pour le floor casting). */
+    public float getCos() { return cosVal; }
 
     @Override
     public String toString() {

@@ -122,9 +122,6 @@ public class MenuAssets {
 
     // ── Palette helpers ───────────────────────────────────────────────────────
 
-    /**
-     * Palette font avec index 0 = transparent (couleur de fond = alpha 0).
-     */
     private int[] buildFontPaletteWithAlpha() {
         int[] pal = new int[8];
         for (int i = 0; i < 8; i++) {
@@ -135,8 +132,6 @@ public class MenuAssets {
     }
 
     private int[] buildCreditsPalette() {
-        // Les credits sont dans les plans 3-5 du morescreen
-        // Ils utilisent la même palette que la font (fontpal pour bits 5-7)
         int[] pal = new int[8];
         for (int i = 0; i < 8; i++) {
             pal[i] = fontpal[i];

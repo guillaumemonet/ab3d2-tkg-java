@@ -69,10 +69,13 @@ public class WallTextureExtractor {
      */
     private static final int[][] CANDIDATE_SIZES = {
         // Tailles confirmees sur les fichiers AB3D2
-        {256, 128},   // 24064 bytes — 6 textures standard (alienredwall, hullmetal...)
-        {256,  64},   // 13056 bytes — 3 textures (brownspeakers, chevrondoor, redhullmetal)
-        {128, 128},   // 13056 bytes — idem (meme taille totale)
-        {128,  32},   //  2752 bytes chunk — brownstonestep
+        // (depuis wMask+1 x hMask+1 dans les WallRenderEntry en jeu)
+        {256, 128},   // 24064 bytes — alienredwall, brownpipes, hullmetal, etc.
+        {128, 128},   // 13056 bytes — brownspeakers, chevrondoor, redhullmetal
+        //             IMPORTANT : 128x128 DOIT etre avant 256x64 (meme taille de fichier)
+        //             Le moteur M68k utilise wMask=127/hMask=127 pour ces 3 textures
+        {128,  32},   //  2752 bytes chunk — brownstonestep (confirme)
+        {256,  64},   // 13056 bytes — MEME TAILLE que 128x128, jamais utilise
         {128,  64},   //  7552 bytes
         {256, 256},   // 46080 bytes (proche rocky/steampunk)
         // Tailles generiques
