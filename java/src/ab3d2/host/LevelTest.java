@@ -223,12 +223,6 @@ public final class LevelTest {
                 Mem.wb(ab3d2.HiresData.MAPON, 0xFF);            // MAPON lu en octet (move.b MAPON)
                 System.out.println("[LevelTest] automap ACTIVÉE (test)");
             }
-            if (System.getProperty("forceWall") != null) {  // test : force la couleur des murs gouraud
-                ab3d2.Hiresgourwall.dbgForceWallPen = Integer.parseInt(System.getProperty("forceWall"));
-            }
-            if (System.getProperty("clearByte") != null) {  // test : couleur sentinelle du clear (trous de couverture)
-                ab3d2.c.DrawC.dbgClearByte = Integer.parseInt(System.getProperty("clearByte"));
-            }
             if ("1".equals(System.getProperty("fullbright"))) { // test : plein-éclat (DEV_SKIP_LIGHTING bit 11)
                 Mem.wl(ab3d2.modules.DevInst.Dev_DebugFlags_l, Mem.l(ab3d2.modules.DevInst.Dev_DebugFlags_l) | (1 << 11));
                 System.out.println("[LevelTest] plein-éclat activé");

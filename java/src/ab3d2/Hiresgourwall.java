@@ -47,7 +47,6 @@ public final class Hiresgourwall {
     private Hiresgourwall() {
     }
 
-    public static int dbgForceWallPen = 0; // TMP : si >0, force la couleur écrite par les pack writers gouraud
 
     private static int Draw_ChunkPtr_l() {
         return ab3d2.bss.DrawBss.Draw_ChunkPtr_l;
@@ -1004,7 +1003,7 @@ public final class Hiresgourwall {
             d4 = swap(d4);                             // swap d4
             d1 = setb(d1, d1 & 31);                    // and.b #31,d1
             d2 = setw(d2, d2 + d1);                    // add.w d1,d2
-            Mem.wb(a3, dbgForceWallPen > 0 ? dbgForceWallPen : Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
+            Mem.wb(a3, Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
             a3 += (short) d0;                          // adda.w d0,a3
             d3 += d5;                                  // add.l d5,d3
             d4 += a2;                                  // add.l a2,d4
@@ -1029,7 +1028,7 @@ public final class Hiresgourwall {
             d1 = setw(d1, (d1 & 0xFFFF) >>> 5);        // lsr.w #5,d1
             d1 = setw(d1, d1 & 31);                    // and.w #31,d1
             d2 = setb(d2, d2 + d1);                    // add.b d1,d2
-            Mem.wb(a3, dbgForceWallPen > 0 ? dbgForceWallPen : Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
+            Mem.wb(a3, Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
             a3 += (short) d0;                          // adda.w d0,a3
             d3 += d5;                                  // add.l d5,d3
             d4 += a2;                                  // add.l a2,d4
@@ -1054,7 +1053,7 @@ public final class Hiresgourwall {
             d1 = setb(d1, (d1 & 0xFF) >>> 2);          // lsr.b #2,d1
             d1 = setw(d1, d1 & 31);                    // and.w #31,d1
             d2 = setb(d2, d2 + d1);                    // add.b d1,d2
-            Mem.wb(a3, dbgForceWallPen > 0 ? dbgForceWallPen : Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
+            Mem.wb(a3, Mem.ub(a4 + ((short) d2) * 2)); // move.b (a4,d2.w*2),(a3)
             a3 += (short) d0;                          // adda.w d0,a3
             d3 += d5;                                  // add.l d5,d3
             d4 += a2;                                  // add.l a2,d4

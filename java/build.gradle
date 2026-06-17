@@ -128,12 +128,6 @@ tasks.register('levelTest', JavaExec) {
     if (project.hasProperty('fullbright')) {
         systemProperty 'fullbright', project.property('fullbright').toString()
     }
-    if (project.hasProperty('clearByte')) {
-        systemProperty 'clearByte', project.property('clearByte').toString()
-    }
-    if (project.hasProperty('forceWall')) {
-        systemProperty 'forceWall', project.property('forceWall').toString()
-    }
     if (project.hasProperty('spawnAt')) {
         systemProperty 'spawnAt', project.property('spawnAt').toString()
     }

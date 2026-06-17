@@ -322,35 +322,6 @@ public final class ScreenC {
         }
     }
 
-    /** Ligne d'affichage du bandeau de messages défilant (ajustable ; au-dessus de la barre HUD). */
-    private static final int NARRATOR_Y = 230;
-
-    /**
-     * renderNarrator — affiche le bandeau de messages (Narrator.SCROLLSCRN, 1 bitplane,
-     * 80 o/ligne × 8 lignes de glyphes 8×8) dans le bitmap écran : 40 octets visibles
-     * (320 px), bits posés → pen 254 (couleur message), bits nuls laissés (overlay).
-     */
-    private static void renderNarrator(int bm) {
-        int rib = ab3d2.Narrator.SCROLLSCRN;
-        byte[] ram = Mem.RAM;
-        for (int r = 0; r < 8; r++) {
-            int dstRow = bm + (NARRATOR_Y + r) * SCREEN_WIDTH;
-            int ribRow = rib + r * 80;
-            for (int b = 0; b < 40; b++) {               // 40 octets = 320 px
-                int bits = ram[ribRow + b] & 0xFF;
-                if (bits == 0) {
-                    continue;
-                }
-                int base = dstRow + b * 8;
-                for (int bit = 0; bit < 8; bit++) {
-                    if ((bits & (0x80 >> bit)) != 0) {
-                        ram[base + bit] = (byte) 254;
-                    }
-                }
-            }
-        }
-    }
-
     /** Borne un index source dans [base, base+total). */
     private static int clampIdx(int idx, int base, int total) {
         int rel = idx - base;

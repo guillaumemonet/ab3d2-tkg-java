@@ -485,15 +485,10 @@ public final class DrawC {
      * la bordure (draw_Border → bitmap écran + Draw_UpdateBorder_RTG) est DIFFÉRÉE
      * en Phase 5 (draw_Border est construit par Draw_Init §3, assets absents).
      */
-    /** Octet de remplissage du clear (0 normal ; sentinelle de debug via -PclearByte). */
-    public static int dbgClearByte = 0;
-
     public static void Draw_ResetGameDisplay() {
         draw_ResetHUDCounters();                             // draw_ResetHUDCounters();
         // Vid_isRTG forcé true (chemin RTG).
-        int b = dbgClearByte & 0xFF;
-        int fill = (b << 24) | (b << 16) | (b << 8) | b;     // octet sentinelle répliqué sur le long
-        ab3d2.modules.Sys.Sys_MemFillLong(Mem.l(Vid_FastBufferPtr_l), fill,
+        ab3d2.modules.Sys.Sys_MemFillLong(Mem.l(Vid_FastBufferPtr_l), 0,
                 (ScreenC.SCREEN_WIDTH * ScreenC.SCREEN_HEIGHT) >> 2); // Sys_MemFillLong(Vid_FastBufferPtr_l, 0, (W*H)>>2);
 
         // « Lock » du bitmap écran hôte (bmBytesPerRow == SCREEN_WIDTH) et copie de la
