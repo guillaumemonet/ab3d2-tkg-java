@@ -119,6 +119,7 @@ public final class Input {
             case GLFW_KEY_D: return RAWKEY_D;             // sidestep right
             case GLFW_KEY_C: return RAWKEY_C;             // duck
             case GLFW_KEY_F: return RAWKEY_F;             // operate
+            case GLFW_KEY_L: return RAWKEY_L;             // look behind (regarder derrière)
             case GLFW_KEY_LEFT:  return RAWKEY_LEFT;      // turn left
             case GLFW_KEY_RIGHT: return RAWKEY_RIGHT;     // turn right
             case GLFW_KEY_UP:    return RAWKEY_UP;
