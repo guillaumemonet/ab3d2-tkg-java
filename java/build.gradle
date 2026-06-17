@@ -1,0 +1,191 @@
+plugins {
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    // LWJGL 3 « moderne » (GLFW + OpenGL + OpenAL).
+    lwjglVersion = '3.3.4'
+    // Natives Windows x64 (poste de dev). Ajouter d'autres classifiers si besoin.
+    lwjglNatives = 'natives-windows'
+}
+
+dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-openal'
+
+    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+}
+
+// Le portage conserve la disposition src/ NetBeans existante (pas src/main/java).
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+        }
+        // Les assets dépackés sont lus directement depuis medias/original via DosLib :
+        // pas de resources Gradle à empaqueter.
+        resources {
+            srcDirs = []
+        }
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    // Point d'entrée réel du moteur (main.c → MainC.run via ab3d2.host.Main).
+    mainClass = 'ab3d2.host.Main'
+}
+
+// Les assets dépackés (medias/original) sont à la RACINE du projet, soit le parent
+// de java/. On exécute donc depuis cette racine pour que Assets.root les résolve.
+def assetRoot = projectDir.parentFile
+
+tasks.named('run') {
+    workingDir = assetRoot
+}
+
+// Vérification de la disposition mémoire (garde-fou de non-régression du portage).
+// Doit afficher « TOUT OK ».
+tasks.register('checkLayout', JavaExec) {
+    group = 'verification'
+    description = 'Vérifie la disposition mémoire du portage (doit afficher TOUT OK)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.tools.CheckLayout'
+    workingDir = assetRoot
+}
+
+// Harnais de validation de la chaîne d'affichage (Phase 1) — fenêtre + palette + buffer test.
+tasks.register('displayTest', JavaExec) {
+    group = 'application'
+    description = "Teste l'afficheur LWJGL (Phase 1) : fenêtre + palette + buffer chunky de test"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.host.DisplayTest'
+    workingDir = assetRoot
+}
+
+// Harnais du MENU (Game_Start) : menu interactif, ou capture avec -PmenuFrames=N.
+tasks.register('menuTest', JavaExec) {
+    group = 'application'
+    description = "Lance le menu (Game_Start). -PmenuFrames=N pour capturer menu_screenshot.png"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.host.MenuTest'
+    workingDir = assetRoot
+    if (project.hasProperty('menuFrames')) {
+        systemProperty 'menuFrames', project.property('menuFrames').toString()
+    }
+    if (project.hasProperty('menuShow')) {
+        systemProperty 'menuShow', project.property('menuShow').toString()
+    }
+    if (project.hasProperty('menuDemo')) {
+        systemProperty 'menuDemo', project.property('menuDemo').toString()
+    }
+    if (project.hasProperty('prefsTest')) {
+        systemProperty 'prefsTest', project.property('prefsTest').toString()
+    }
+    if (project.hasProperty('introText')) {
+        systemProperty 'introText', project.property('introText').toString()
+    }
+}
+
+// Harnais d'intégration (Phase 2) : charge un niveau réel et le rend (bypass menu).
+tasks.register('levelTest', JavaExec) {
+    group = 'application'
+    description = "Charge et affiche un niveau (Phase 2) en court-circuitant le menu"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.host.LevelTest'
+    workingDir = assetRoot
+    if (project.hasProperty('lvlArgs')) {
+        args(project.property('lvlArgs').toString().split(' '))
+    }
+    if (project.hasProperty('dumpObjects')) {
+        systemProperty 'dumpObjects', project.property('dumpObjects').toString()
+    }
+    if (project.hasProperty('killPlayer')) {
+        systemProperty 'killPlayer', project.property('killPlayer').toString()
+    }
+    if (project.hasProperty('showMap')) {
+        systemProperty 'showMap', project.property('showMap').toString()
+    }
+    if (project.hasProperty('fov')) {
+        systemProperty 'fov', project.property('fov').toString()
+    }
+    if (project.hasProperty('fullbright')) {
+        systemProperty 'fullbright', project.property('fullbright').toString()
+    }
+    if (project.hasProperty('clearByte')) {
+        systemProperty 'clearByte', project.property('clearByte').toString()
+    }
+    if (project.hasProperty('forceWall')) {
+        systemProperty 'forceWall', project.property('forceWall').toString()
+    }
+    if (project.hasProperty('spawnAt')) {
+        systemProperty 'spawnAt', project.property('spawnAt').toString()
+    }
+    if (project.hasProperty('sampleCenter')) {
+        systemProperty 'sampleCenter', project.property('sampleCenter').toString()
+    }
+    if (project.hasProperty('sampleY')) {
+        systemProperty 'sampleY', project.property('sampleY').toString()
+    }
+    if (project.hasProperty('texLog')) {
+        systemProperty 'texLog', project.property('texLog').toString()
+    }
+    if (project.hasProperty('animDump')) {
+        systemProperty 'animDump', project.property('animDump').toString()
+    }
+    if (project.hasProperty('altTex')) {
+        systemProperty 'altTex', project.property('altTex').toString()
+    }
+    if (project.hasProperty('forceFrame')) {
+        systemProperty 'forceFrame', project.property('forceFrame').toString()
+    }
+    if (project.hasProperty('dumpRawObj')) {
+        systemProperty 'dumpRawObj', project.property('dumpRawObj').toString()
+    }
+    if (project.hasProperty('cheesy')) {
+        systemProperty 'cheesy', project.property('cheesy').toString()
+    }
+    if (project.hasProperty('wavOut')) {
+        systemProperty 'wavOut', project.property('wavOut').toString()
+    }
+    if (project.hasProperty('testPickup')) {
+        systemProperty 'testPickup', project.property('testPickup').toString()
+    }
+    if (project.hasProperty('testSwitch')) {
+        systemProperty 'testSwitch', project.property('testSwitch').toString()
+    }
+    if (project.hasProperty('testWeapons')) {
+        systemProperty 'testWeapons', project.property('testWeapons').toString()
+    }
+    if (project.hasProperty('testFire')) {
+        systemProperty 'testFire', project.property('testFire').toString()
+    }
+    if (project.hasProperty('testSfx')) {
+        systemProperty 'testSfx', project.property('testSfx').toString()
+    }
+    if (project.hasProperty('testMsg')) {
+        systemProperty 'testMsg', project.property('testMsg').toString()
+    }
+    if (project.hasProperty('telefxFrame')) {
+        systemProperty 'telefxFrame', project.property('telefxFrame').toString()
+    }
+    if (project.hasProperty('fullScreen')) {
+        systemProperty 'fullScreen', project.property('fullScreen').toString()
+    }
+}
