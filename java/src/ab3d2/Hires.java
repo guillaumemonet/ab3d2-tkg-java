@@ -2941,15 +2941,7 @@ public final class Hires {
                 Mem.wb(ab3d2.ControlloopData.Game_FinishedLevel_b, 0xFF); // st Game_FinishedLevel_b
             }
             // .nonextlev:
-            Mem.wl(ab3d2.modules.Music.mt_data, HiresData.welldone); // move.l #welldone,mt_data
-            Mem.wb(UseAllChannels, 0xFF);                    // st UseAllChannels
-            Mem.wb(ab3d2.modules.Music.reachedend, 0);       // clr.b reachedend
-            ab3d2.modules.Music.mt_init();                   // jsr mt_init
-            // playwelldone:
-            for (int g = 0; Mem.b(ab3d2.modules.Music.reachedend) == 0 && g < MUSIC_END_LOOP_CAP; g++) {
-                WaitTOF();                                   // CALLGRAF WaitTOF
-                ab3d2.modules.Music.mt_music();              // jsr mt_music
-            }
+            playEndMusic(HiresData.welldone);                // move.l #welldone,mt_data ; mt_init ; playwelldone
             if (Mem.b(Plr_MultiplayerType_b) == PLR_SINGLE   // cmp PLR_SINGLE ; bne wevelost
                 && Mem.w(ab3d2.ControlloopData.Game_LevelCounter_w) == Defs.NUM_LEVELS) { // cmp NUM_LEVELS
                 Mem.ww(ab3d2.ControlloopData.Game_LevelCounter_w, 0); // clr.w (retour au début)
@@ -2958,20 +2950,52 @@ public final class Hires {
         } else {
             Mem.ww(ab3d2.bss.DrawBss.draw_DisplayEnergyCount_w, 0); // move.w #0
             ab3d2.c.GameProgress.Game_LevelFailed();         // STATS_DIED
-            Mem.wl(ab3d2.modules.Music.mt_data, HiresData.gameover); // move.l #gameover,mt_data
-            Mem.wb(UseAllChannels, 0xFF);                    // st UseAllChannels
-            Mem.wb(ab3d2.modules.Music.reachedend, 0);       // clr.b reachedend
-            ab3d2.modules.Music.mt_init();                   // jsr mt_init
-            // playgameover:
-            for (int g = 0; Mem.b(ab3d2.modules.Music.reachedend) == 0 && g < MUSIC_END_LOOP_CAP; g++) {
-                WaitTOF();
-                ab3d2.modules.Music.mt_music();
-            }
+            playEndMusic(HiresData.gameover);                // move.l #gameover,mt_data ; mt_init ; playgameover
             // bra wevelost
         }
         // wevelost:
         CustomChips.write16(0xdff000 + 0x096, 0xf);          // move.w #$f,dmacon (audio off)
         closeeverything();                                   // jmp closeeverything
+    }
+
+    /**
+     * Joue une musique de fin (welldone / gameover) jusqu'à reachedend.
+     *
+     * L'ASM original fait {@code mt_init} puis une boucle {@code WaitTOF ; mt_music} : sur Amiga
+     * WaitTOF attend le vsync pendant que Paula joue en DMA, et l'IRQ mixe. Ici WaitTOF est un
+     * simple compteur → la boucle d'origine s'exécutait instantanément (musique muette + retour
+     * menu immédiat). On reconstitue donc une vraie frame hôte : on cadence à ~50 Hz (PAL), on
+     * mixe les registres Paula vers OpenAL ({@link #pumpAudioToHost}, car dosounds=0 ici) et on
+     * présente l'écran (events + fenêtre). Borné par {@link #MUSIC_END_LOOP_CAP}.
+     */
+    private static void playEndMusic(int musicData) {
+        Mem.wl(ab3d2.modules.Music.mt_data, musicData);      // move.l #music,mt_data
+        Mem.wb(UseAllChannels, 0xFF);                        // st UseAllChannels
+        Mem.wb(ab3d2.modules.Music.reachedend, 0);           // clr.b reachedend
+        ab3d2.modules.Music.mt_init();                       // jsr mt_init
+        final long frameNs = 20_000_000L;                    // ~50 Hz (cadence PAL de la musique)
+        long next = System.nanoTime() + frameNs;
+        for (int g = 0; Mem.b(ab3d2.modules.Music.reachedend) == 0 && g < MUSIC_END_LOOP_CAP; g++) {
+            ab3d2.host.Display d = ab3d2.c.ScreenC.hostDisplay();
+            if (d != null && d.shouldClose()) {              // fermeture fenêtre pendant la musique
+                break;
+            }
+            pumpAudioToHost();                               // mixe Paula → OpenAL (musique courante)
+            ab3d2.c.ScreenC.Vid_Present();                   // présente + pollEvents (le sleep ci-dessous cadence)
+            ab3d2.modules.Music.mt_music();                  // jsr mt_music (avance la chanson)
+            long sleepNs = next - System.nanoTime();
+            if (sleepNs > 0) {
+                try {
+                    Thread.sleep(sleepNs / 1_000_000L, (int) (sleepNs % 1_000_000L));
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                next += frameNs;
+            } else {
+                next = System.nanoTime() + frameNs;          // retard → resync
+            }
+        }
     }
 
     /** endnomusic (hires.s 3497-3501) : fin sans musique (quit 2J). */
@@ -4428,6 +4452,15 @@ public final class Hires {
 
     private static void JUSTSOUNDS() {
         if (Mem.b(dosounds) == 0) return;                     // tst.b dosounds ; beq .notthing
+        pumpAudioToHost();
+    }
+
+    /**
+     * Mixe les registres Paula courants → buffers hôte (newsampbitl) → OpenAL, pour une frame.
+     * Indépendant de {@code dosounds} : utilisé par JUSTSOUNDS (jeu) ET par la musique de fin
+     * ({@link #playEndMusic}, où dosounds=0 mais la musique doit quand même sortir).
+     */
+    static void pumpAudioToHost() {
         try {                                                 // filet de sécurité : une exception audio ne doit pas planter le jeu
             if (ab3d2.host.Audio.dbgCapture) {                // DIAG : capture WAV (1 trame/frame, hors OpenAL)
                 newsampbitl();

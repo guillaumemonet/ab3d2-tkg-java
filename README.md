@@ -111,6 +111,41 @@ menu : choisis un niveau en solo, le texte d'intro s'affiche, puis le niveau se 
 gradle -p java compileJava
 ```
 
+### Build redistribuable (Windows)
+
+Produit une **app-image portable** : un dossier autonome contenant l'exécutable, un **JRE
+embarqué** (rien à installer côté utilisateur) et les assets du jeu.
+
+```bash
+gradle -p java packageApp
+```
+
+Résultat : `java/build/jpackage/AlienBreed3D2-TKG/` — lancer `AlienBreed3D2-TKG.exe`.
+
+- Nécessite `jpackage` (inclus dans le JDK qui exécute Gradle).
+- Le dossier est **déplaçable** : `Main` résout les assets (`medias/original`) et le dossier
+  d'écriture (`run/`) **relativement à l'emplacement de l'exécutable**. On peut aussi forcer ces
+  chemins avec `-Dab3d2.dataDir=...` / `-Dab3d2.runDir=...`.
+- ⚠️ Les assets embarqués appartiennent à Team17 : ce paquet est réservé à un **usage personnel /
+  possesseurs du jeu**, pas à une diffusion publique.
+- Build **Windows x64** uniquement (natives LWJGL). Pour d'autres OS, ajouter le classifier de
+  natives correspondant dans `build.gradle`.
+
+### Diagnostic (gel / logs)
+
+L'app-image est **sans console** : `Main` redirige donc `stdout`/`stderr` vers
+`<App>/run/ab3d2.log`. En cas de **gel**, un *watchdog* surveille le rythme des frames et, si plus
+aucune frame ne passe pendant 5 s, écrit dans le log la **pile de tous les threads** (cherche
+`"main"` → c'est la boucle où le moteur est bloqué).
+
+- `-Dab3d2.watchdogMs=N` : seuil de détection (ms ; `0` = désactive le watchdog).
+- `-Dab3d2.log=chemin` : fichier de log (`off` = garder la console).
+- Les `OutOfMemoryError` éventuels sont journalisés et déclenchent un *heap dump* (le build fixe
+  `-Xms256m -Xmx1g`). Un **gel n'est pas un OOM** : un manque de mémoire produit une erreur tracée,
+  pas un blocage silencieux.
+- Pour un debug **en direct**, lancer depuis un terminal `gradle -p java run` (la console est
+  conservée en mode dev).
+
 ### Vérifier l'intégrité du portage
 
 `checkLayout` valide la disposition mémoire (offsets des structures) — garde-fou de

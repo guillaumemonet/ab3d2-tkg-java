@@ -47,9 +47,16 @@ java {
     }
 }
 
+base {
+    // Nom du jar principal (utilisé par --main-jar de jpackage).
+    archivesName = 'ab3d2-tkg'
+}
+
 application {
     // Point d'entrée réel du moteur (main.c → MainC.run via ab3d2.host.Main).
     mainClass = 'ab3d2.host.Main'
+    // Nom de l'app-image redistribuable (dossier + exécutable).
+    applicationName = 'AlienBreed3D2-TKG'
 }
 
 // Les assets dépackés (medias/original) sont à la RACINE du projet, soit le parent
@@ -67,6 +74,15 @@ tasks.register('checkLayout', JavaExec) {
     description = 'Vérifie la disposition mémoire du portage (doit afficher TOUT OK)'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'ab3d2.tools.CheckLayout'
+    workingDir = assetRoot
+}
+
+// Diagnostic : rend le backdrop ciel (rawbackpacked) en PNG (sky_colmajor/rowmajor.png).
+tasks.register('skyDump', JavaExec) {
+    group = 'verification'
+    description = 'Rend rawbackpacked en PNG (diagnostic ciel)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.tools.SkyDump'
     workingDir = assetRoot
 }
 
@@ -181,5 +197,59 @@ tasks.register('levelTest', JavaExec) {
     }
     if (project.hasProperty('fullScreen')) {
         systemProperty 'fullScreen', project.property('fullScreen').toString()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Build redistribuable Windows : app-image jpackage (JRE embarqué + assets).
+//   gradle -p java packageApp
+// Produit build/jpackage/AlienBreed3D2-TKG/ (dossier portable, AlienBreed3D2-TKG.exe).
+// Nécessite jpackage (inclus dans le JDK qui exécute Gradle).
+// ---------------------------------------------------------------------------
+def appImageName = application.applicationName
+def appImageDest = layout.buildDirectory.dir('jpackage').get().asFile
+def appImageDir  = new File(appImageDest, appImageName)
+
+// Étape 1 : jpackage crée l'app-image (exécutable + JRE embarqué).
+tasks.register('jpackageImage', Exec) {
+    group = 'distribution'
+    description = "Crée l'app-image jpackage (sans les assets)."
+    dependsOn 'installDist'
+    def libDir   = layout.buildDirectory.dir("install/${appImageName}/lib").get().asFile
+    def jpackage = "${System.getProperty('java.home')}/bin/jpackage"
+    doFirst {
+        // jpackage refuse d'écrire si l'image existe déjà → on repart propre.
+        appImageDir.deleteDir()
+        appImageDest.mkdirs()
+    }
+    commandLine jpackage,
+        '--type', 'app-image',
+        '--name', appImageName,
+        '--input', libDir.absolutePath,
+        '--main-jar', "${base.archivesName.get()}.jar",
+        '--main-class', application.mainClass.get(),
+        '--dest', appImageDest.absolutePath,
+        '--java-options', '-Xms256m',
+        '--java-options', '-Xmx1g',
+        '--java-options', '-XX:+HeapDumpOnOutOfMemoryError'
+}
+
+// Étape 2 : copie les assets + dossier d'écriture à côté de l'exe (résolus par Main).
+//   gradle -p java packageApp  →  build/jpackage/AlienBreed3D2-TKG/ (dossier portable).
+tasks.register('packageApp', Copy) {
+    group = 'distribution'
+    description = 'Build redistribuable Windows complet (app-image jpackage + assets embarqués).'
+    dependsOn 'jpackageImage'
+    def srcMedias = new File(assetRoot, 'medias/original')
+    doFirst {
+        if (!srcMedias.isDirectory()) {
+            throw new GradleException("Assets introuvables : ${srcMedias} (requis pour le build embarqué)")
+        }
+    }
+    from srcMedias
+    into new File(appImageDir, 'medias/original')
+    doLast {
+        new File(appImageDir, 'run').mkdirs()   // dossier d'écriture (prefs, sauvegardes)
+        println "App-image redistribuable : ${appImageDir.absolutePath}"
     }
 }

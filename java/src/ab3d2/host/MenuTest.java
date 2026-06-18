@@ -141,6 +141,8 @@ public final class MenuTest {
             Res.Res_LoadWallTextures();
             Res.Res_LoadFloorsAndTextures();
             Res.Res_LoadObjects();
+            FileIo.IO_QueueFile(ab3d2.data.DrawData.draw_BackdropImageName_vb,
+                    ab3d2.bss.DrawBss.Draw_BackdropImagePtr_l, 0); // backdrop ciel (controlloop.s:79)
             FileIo.IO_FlushQueue();
             Res.Res_PatchSoundFx();
         } catch (Throwable t) {

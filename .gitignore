@@ -1,0 +1,24 @@
+# Sorties de build Gradle
+/java/build/
+/java/.gradle/
+/java/bin/
+
+# État runtime (préférences, sauvegardes, stats, logs) généré à l'exécution
+/run/
+
+# Captures / diagnostics générés par les harnais (workingDir = racine du projet)
+/*.png
+*.stackdump
+
+# Fichiers parasites
+/9
+/affichage
+
+# IDE
+/.idea/
+*.iml
+/nbproject/private/
+
+# OS
+.DS_Store
+Thumbs.db

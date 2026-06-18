@@ -341,6 +341,15 @@ public final class Objdrawhires {
         int d0 = 0;                                    // moveq #0,d0
         while ((byte) Mem.ub(a0 + (d0 & 0xFFFF)) == -128) { // .backinto: cmp.b #-128,(a0,d0.w) ; bne .okbr
             d0 = setw(d0, d0 + 1);                     // addq #1,d0
+            // GARDE anti-freeze (l'ASM original ne borne pas .backinto) : si les 16 octets de
+            // l'anneau sont tous vides (-128), d0 dépasse 15 → d7 (pos. départ) ≥ 16, que la
+            // boucle .findnext (masquée &15) ne peut jamais ré-atteindre → boucle externe
+            // infinie. Anneau vide = rien à interpoler : on sort. Identique à l'original pour
+            // des données valides (où .backinto s'arrête à d0 < 16). Donnée dégénérée signalée.
+            if ((d0 & 0xFFFF) >= 16) {
+                warnEmptyBrightRing(a0);
+                return;
+            }
         }
         // .okbr
         int d7 = setb(0, d0);                          // move.b d0,d7  (starting pos)
@@ -361,15 +370,13 @@ public final class Objdrawhires {
             d2 = swap(d2);                             // swap d2
             d3 = swap(d3);                             // swap d3
             if (d3 != 0) {                             // beq .skip_zero_dividend  (tst.l d3 implicite via swap result)
-                // OneOverN_vw(pc,d4.w*2)
+                int d4saveW = d4 & 0xFFFF;             // move.w d4,-2(sp)  ← sauve l'ÉCART (avant écrasement)
                 d4 = setw(d4, Mem.uw(OneOverN_vw + (d4 & 0xFFFF) * 2)); // move.w OneOverN_vw(pc,d4.w*2),d4
-                int d4save = d4;                       // (move.w d4,-2(sp) sauvegarde)
                 d4 = (short) d4;                       // ext.l d4
                 d3 = d3 >> 7;                          // asr.l #7,d3
                 d3 = d3 * d4;                          // muls.l d4,d3
                 d3 = d3 >> 7;                          // asr.l #7,d3
-                d4 = setw(d4save, d4save);             // move.w -2(sp),d4 (restaure d4 = la valeur 1/N)
-                d4 = d4save;
+                d4 = setw(d4, d4saveW);                // move.w -2(sp),d4 (restaure l'écart → compteur de tweens)
             }
             // .skip_zero_dividend
             d4 = setw(d4, d4 - 1);                     // subq #1,d4  (number of tweens)
@@ -388,6 +395,20 @@ public final class Objdrawhires {
             // bra .findnext
         }
         // .done_all: rts
+    }
+
+    private static boolean warnedEmptyBrightRing = false;
+
+    /** Signale (une fois) un anneau de luminosité vide — donnée dégénérée déclenchant la garde anti-freeze. */
+    private static void warnEmptyBrightRing(int a0) {
+        if (warnedEmptyBrightRing) {
+            return;
+        }
+        warnedEmptyBrightRing = true;
+        int ring = (a0 - draw_AngleBrights_vl);
+        System.err.println("[draw_TweenBrights] anneau de luminosité vide (offset +" + ring
+                + ", zone " + Mem.uw(Draw_CurrentZone_w) + ", modèle " + dbgCurModel
+                + ") — interpolation ignorée (garde anti-freeze). Donnée probablement corrompue.");
     }
 
     // ==================================================================

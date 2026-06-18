@@ -133,11 +133,20 @@ public final class Display {
         glEnd();
 
         glfwSwapBuffers(window);
+        frameHeartbeat++;                       // battement (surveillance anti-freeze)
     }
+
+    /**
+     * Compteur de frames présentées, incrémenté à chaque {@link #present}/{@link #pollEvents}.
+     * Lu par le watchdog de {@link Main} : s'il cesse d'avancer, le moteur est gelé dans une
+     * boucle (volatile car lu depuis un autre thread).
+     */
+    public static volatile long frameHeartbeat = 0;
 
     /** Pompe les événements fenêtre/entrée (callbacks GLFW). */
     public void pollEvents() {
         glfwPollEvents();
+        frameHeartbeat++;                       // battement (surveillance anti-freeze)
     }
 
     /** Vrai si l'utilisateur a demandé la fermeture (croix fenêtre). */

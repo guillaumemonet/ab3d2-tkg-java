@@ -240,6 +240,10 @@ public final class Controlloop {
             ab3d2.modules.Res.Res_LoadWallTextures();
             ab3d2.modules.Res.Res_LoadFloorsAndTextures();
             ab3d2.modules.Res.Res_LoadObjects();
+            // Backdrop ciel (controlloop.s:79-82) — OMIS dans le portage git → Draw_BackdropImagePtr_l
+            // restait à 0/garbage et Draw_SkyBackdrop lisait n'importe quoi (ciel corrompu).
+            ab3d2.modules.FileIo.IO_QueueFile(ab3d2.data.DrawData.draw_BackdropImageName_vb,
+                    ab3d2.bss.DrawBss.Draw_BackdropImagePtr_l, 0); // a0=nom, d0=&ptr, d1=0
             ab3d2.modules.FileIo.IO_FlushQueue();
             ab3d2.modules.Res.Res_PatchSoundFx();
         } catch (Throwable t) {
