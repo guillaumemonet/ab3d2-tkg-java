@@ -37,6 +37,14 @@ public final class MenunbData {
     public static final int mnu_MYLEVELMENUTEXT2;
     public static final int mnu_LevelIName_vb;     // 8 noms I..P
 
+    // -- menus 2 joueurs (master / slave) --
+    public static final int mnu_MYMASTERMENU;
+    public static final int mnu_MYMASTERTEXT;
+    public static final int mnu_CURRENTLEVELLINEM; // ligne 2 de MYMASTERTEXT (niveau choisi par le master)
+    public static final int mnu_MASTERMODELINE;    // ligne 3 : mode VERSUS / CO-OP (ajout : sélecteur 2J)
+    public static final int mnu_MYSLAVEMENU;
+    public static final int mnu_MYSLAVETEXT;
+
     // -- menus options / contrôles --
     public static final int mnu_MYCUSTOMOPTSMENU;
     public static final int optionLines;           // ligne 2 du texte custom (Y/N à l'offset 17)
@@ -193,6 +201,32 @@ public final class MenunbData {
         Mem.dcW(20);
         Mem.dcW(9);
         for (int i = 0; i < 7; i++) Mem.dcL(0, 0);
+
+        // ---- menu 2 JOUEURS MASTER (menunb.s 1441 + ligne MODE ajoutée) — 5 items ----
+        mnu_MYMASTERTEXT = line("  2 PLAYER  MASTER", 1);   // item 0 (titre ; sélection → menu slave)
+        mnu_CURRENTLEVELLINEM = line("", 1);                // item 1 : niveau choisi (game_SetMenuLevelName)
+        mnu_MASTERMODELINE = line("", 1);                   // item 2 : mode VERSUS / CO-OP (toggle)
+        line("     PLAY  GAME", 1);                         // item 3
+        line("  CONTROL  OPTIONS", 0);                      // item 4
+
+        mnu_MYMASTERMENU = Mem.dcW(0, 80);                  // X=0, Y=80
+        Mem.dcL(mnu_MYMASTERTEXT);                          // textPtr
+        Mem.dcW(0, 80);                                     // curX=0, curY=80
+        Mem.dcW(20);                                        // spread=20
+        Mem.dcW(5);                                         // items=5
+        for (int i = 0; i < 8; i++) Mem.dcL(0);             // ds.l 8
+
+        // ---- menu 2 JOUEURS SLAVE (menunb.s 1461) — 3 items ----
+        mnu_MYSLAVETEXT = line("   2 PLAYER SLAVE", 1);     // item 0 (titre ; sélection → menu principal)
+        line("     PLAY  GAME", 1);                         // item 1
+        line("  CONTROL  OPTIONS", 0);                      // item 2
+
+        mnu_MYSLAVEMENU = Mem.dcW(0, 80);
+        Mem.dcL(mnu_MYSLAVETEXT);
+        Mem.dcW(0, 80);
+        Mem.dcW(20);
+        Mem.dcW(3);                                         // items=3
+        for (int i = 0; i < 6; i++) Mem.dcL(0);             // ds.l 6
 
         // ---- menu CUSTOM OPTIONS (toggles Y/N) ----
         int customText = line("", 1);

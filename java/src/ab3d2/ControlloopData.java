@@ -41,7 +41,7 @@ public final class ControlloopData {
     public static final int next_weapon_key = Mem.dcB(RawKeyMacros.RAWKEY_BSLASH);
     public static final int spare_key = Mem.dcB(0);
 
-    public static final int Prefs_FullScreen_b = Mem.dcB(0);
+    public static final int Prefs_FullScreen_b = Mem.dcB(1); // défaut = grande vue 3D (Vid_FullScreen)
     public static final int Prefs_PixelMode_b = Mem.dcB(0);
     public static final int Prefs_VertMargin_b = Mem.dcB(0);
     public static final int Prefs_SimpleLighting_b = Mem.dcB(0);

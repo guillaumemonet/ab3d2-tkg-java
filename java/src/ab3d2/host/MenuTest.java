@@ -99,6 +99,8 @@ public final class MenuTest {
                 case "load"     -> ab3d2.data.MenunbData.mnu_MYLOADMENU;
                 case "save"     -> ab3d2.data.MenunbData.mnu_MYSAVEMENU;
                 case "demo"     -> ab3d2.data.MenunbData.mnu_DEMOMENU;
+                case "master"   -> ab3d2.data.MenunbData.mnu_MYMASTERMENU;
+                case "slave"    -> ab3d2.data.MenunbData.mnu_MYSLAVEMENU;
                 default          -> mnu_MYMAINMENU;
             };
             MenuNb.mnu_openmenu(which);

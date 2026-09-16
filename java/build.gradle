@@ -65,6 +65,16 @@ def assetRoot = projectDir.parentFile
 
 tasks.named('run') {
     workingDir = assetRoot
+    // Lien 2 joueurs (menu « 1 PLAYER ») : hôte/port du pair. Le slave se connecte à -PnetHost.
+    if (project.hasProperty('netHost')) {
+        systemProperty 'ab3d2.netHost', project.property('netHost').toString()
+    }
+    if (project.hasProperty('netPort')) {
+        systemProperty 'ab3d2.netPort', project.property('netPort').toString()
+    }
+    if (project.hasProperty('coop')) {              // -Pcoop = défaut CO-OP dans le menu master (togglable)
+        systemProperty 'ab3d2.coop', 'true'
+    }
 }
 
 // Vérification de la disposition mémoire (garde-fou de non-régression du portage).
@@ -74,6 +84,43 @@ tasks.register('checkLayout', JavaExec) {
     description = 'Vérifie la disposition mémoire du portage (doit afficher TOUT OK)'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'ab3d2.tools.CheckLayout'
+    workingDir = assetRoot
+}
+
+// Harnais de LANCEMENT 2 joueurs (lien TCP) — une instance master ou slave, interactif.
+//   Terminal 1 : gradle -p java twoPlayer -PnetArgs="master 0"
+//   Terminal 2 : gradle -p java twoPlayer -PnetArgs="slave 0 localhost"
+// Lancer le master d'abord. -PnetPort=N pour changer de port (défaut 7979).
+tasks.register('twoPlayer', JavaExec) {
+    group = 'application'
+    description = 'Lance une instance 2 joueurs (lien TCP). -PnetArgs="master|slave [niveau] [hôte]"'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.host.TwoPlayerTest'
+    workingDir = assetRoot
+    if (project.hasProperty('netArgs')) {
+        args(project.property('netArgs').toString().split(' '))
+    }
+    if (project.hasProperty('netPort')) {
+        systemProperty 'netPort', project.property('netPort').toString()
+    }
+    if (project.hasProperty('netFrames')) {
+        systemProperty 'net.frames', project.property('netFrames').toString()
+    }
+    if (project.hasProperty('coop')) {              // -Pcoop = mode CO-OP (ennemis) ; défaut = VERSUS
+        systemProperty 'ab3d2.coop', 'true'
+    }
+    if (project.hasProperty('netWalk')) {           // -PnetWalk = test : avance en continu (aggro aliens)
+        systemProperty 'net.walk', 'true'
+    }
+}
+
+// Test « client/serveur local » du lien 2 joueurs (TCP) : lance master + slave (fork) sur
+// localhost et vérifie l'échange lock-step de longs (SENDFIRST/RECFIRST). Doit afficher PASS.
+tasks.register('netTest', JavaExec) {
+    group = 'verification'
+    description = 'Teste le lien 2 joueurs TCP en local (master + slave sur localhost) — doit afficher PASS'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.tools.SerialLinkTest'
     workingDir = assetRoot
 }
 
@@ -129,8 +176,32 @@ tasks.register('levelTest', JavaExec) {
     if (project.hasProperty('lvlArgs')) {
         args(project.property('lvlArgs').toString().split(' '))
     }
+    if (project.hasProperty('geomZone')) {          // DIAG : releve les surfaces d'une zone
+        systemProperty 'geomZone', project.property('geomZone').toString()
+    }
+    if (project.hasProperty('geomFrame')) {
+        systemProperty 'geomFrame', project.property('geomFrame').toString()
+    }
+    if (project.hasProperty('walk')) {              // DIAG : avance en continu (ouvre les portes)
+        systemProperty 'walk', project.property('walk').toString()
+    }
+    if (project.hasProperty('playerTrace')) {       // DIAG : releve la camera toutes les N frames
+        systemProperty 'playerTrace', project.property('playerTrace').toString()
+    }
+    if (project.hasProperty('aiTrace')) {           // DIAG : trace l'IA (N aliens, 1 ligne/frame)
+        systemProperty 'aiTrace', project.property('aiTrace').toString()
+    }
     if (project.hasProperty('dumpObjects')) {
         systemProperty 'dumpObjects', project.property('dumpObjects').toString()
+    }
+    if (project.hasProperty('dumpBrights')) {
+        systemProperty 'dumpBrights', project.property('dumpBrights').toString()
+    }
+    if (project.hasProperty('dumpGeom')) {
+        systemProperty 'dumpGeom', project.property('dumpGeom').toString()
+    }
+    if (project.hasProperty('dumpWallTex')) {
+        systemProperty 'dumpWallTex', project.property('dumpWallTex').toString()
     }
     if (project.hasProperty('killPlayer')) {
         systemProperty 'killPlayer', project.property('killPlayer').toString()

@@ -175,6 +175,7 @@ import static ab3d2.Hires.SCREEN_WIDTH;
  */
 public final class Newanims {
 
+
     private Newanims() {
     }
 
@@ -870,7 +871,7 @@ public final class Newanims {
                     a0 += 2;                           // move.w (a0)+,d2  (conditions, valeur ignorée)
                     d2 = setw(0, Mem.uw(anim_CurrentLiftable_w)); // move.w anim_CurrentLiftable_w,d2
                     d5 = setw(0, Mem.uw(anim_LiftOnlyLocks_w));   // move.w anim_LiftOnlyLocks_w,d5
-                    if ((d5 & (1 << (d2 & 15))) == 0) { // btst d2,d5 ; beq.s .satisfied
+                    if ((d5 & (1 << (d2 & 31))) == 0) { // btst d2,d5 (registre → mod 32 ; d5=word donc bits 16-31=0 → lift ≥16 toujours libre)
                         // .satisfied (1051)
                         a3 = Mem.l(Lvl_ZoneEdgePtr_l); // move.l Lvl_ZoneEdgePtr_l,a3
                         d4 = setb(0, Mem.ub(a0)); a0 += 1; // moveq #0,d4 ; move.b (a0)+,d4  (raise bits)
@@ -1169,7 +1170,7 @@ public final class Newanims {
                         a0 += 2;                       // move.w (a0)+,d2  (32, valeur ignorée)
                         d2 = setw(0, Mem.uw(anim_CurrentLiftable_w)); // move.w anim_CurrentLiftable_w,d2
                         d5 = setw(0, Mem.uw(Anim_DoorAndLiftLocks_l)); // move.w Anim_DoorAndLiftLocks_l,d5
-                        if ((d5 & (1 << (d2 & 15))) != 0) { // btst d2,d5 ; beq.s satisfied
+                        if ((d5 & (1 << (d2 & 31))) != 0) { // btst d2,d5 (registre → mod 32 ; d5=word donc bits 16-31=0 → porte ≥16 toujours ouverte)
                             // (lock path) move.w (a0)+,d5
                             d5 = setw(0, Mem.uw(a0)); a0 += 2; // move.w (a0)+,d5  (34)
                             lbl = DOOR_SIMPLE;

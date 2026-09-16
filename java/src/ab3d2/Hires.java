@@ -162,6 +162,27 @@ public final class Hires {
     /** Hook de test : si >= 0, game_main_loop s'arrête après ce nombre de frames (sinon infini). */
     public static int loopFrameLimit = -1;
 
+    /** Anti-répétition de la touche pavé-Entrée (bascule petit/grand viewport). */
+    private static boolean fsToggleHeld = false;
+
+    /**
+     * Mode « headless » (moteur jME / renderer-swap) : la simulation tourne mais le rendu logiciel
+     * du port (loop_DrawPlayer1/2, carte, viseur) et la présentation (Vid_Present) sont court-circuités
+     * — c'est jME qui rend en vraie 3D en lisant l'état. Le limiteur FPS interne est aussi désactivé
+     * (jME cadence via frameSync). Aucun impact quand false (comportement par défaut inchangé).
+     */
+    public static volatile boolean headless = false;
+
+    /** Demande d'arrêt du game_main_loop en mode headless (jME ferme → le thread du port sort proprement). */
+    public static volatile boolean headlessStop = false;
+
+    /**
+     * Point de synchro de frame appelé une fois par itération de game_main_loop quand {@link #headless}.
+     * jME y installe une barrière : le thread du port s'y bloque pendant que jME lit un état cohérent
+     * et rend, puis est relâché pour calculer la frame suivante. Null = pas de barrière (free-run).
+     */
+    public static Runnable frameSync = null;
+
 
     // hardware/dmabits.i — bits DMACON utilisés par Game_Begin.
     public static final int DMAF_AUDIO = 0x000F;   // canaux audio 0-3
@@ -1312,6 +1333,11 @@ public final class Hires {
                     Mem.ww(above, 0);                          // move.w #0,above
                     d6 = setw(d6, Mem.uw(a0));
                     a0 += 2;                                   // move.w (a0)+,d6  (floorY)
+                    if (dbgGeomHit(Mem.w(ab3d2.bss.DrawBss.Draw_CurrentZone_w))) {
+                        System.out.printf("GEOM zone=%d FLAT type=%d y=%d (monde %.2f)%n",
+                                Mem.w(ab3d2.bss.DrawBss.Draw_CurrentZone_w), d0,
+                                (short) d6, (short) d6 / 128.0);
+                    }
                     if (Mem.b(draw_UseWater_b) != 0) {         // tst.b draw_UseWater_b ; beq.s .oknon
                         if (Mem.b(DOANYWATER) == 0) {          // tst.b DOANYWATER ; beq dontdrawreturn
                             lbl = DONTDRAWRETURN;
@@ -2294,7 +2320,14 @@ public final class Hires {
         int a2 = ab3d2.bss.AiBss.AI_AlienTeamWorkspace_vl;
 
         while (true) {                                       // game_main_loop:
+            dbgAiTrace();                                    // DIAG : trace l'IA (comparaison remake)
+            dbgPlayerTrace();                                // DIAG : releve la camera du joueur
+            if (dbgWalk) {                                   // DIAG : maintient AVANCER enfonce
+                Mem.wb(ab3d2.bss.TablesBss.KeyMap_vb
+                        + Mem.ub(ab3d2.ControlloopData.forward_key), 0xFF);
+            }
             if (loopFrameLimit >= 0 && loopFrameLimit-- == 0) return; // hook de test (arrêt après N frames)
+            if (headless && headlessStop) return;            // jME a demandé l'arrêt
             if (loopFrameLimit < 0) {                        // mode interactif (hôte) : sortie sur fermeture fenêtre
                 ab3d2.host.Display d = ab3d2.c.ScreenC.hostDisplay();
                 if (d != null && d.shouldClose()) return;
@@ -2355,6 +2388,16 @@ public final class Hires {
             // .notmess2: potgo no-op
             Mem.wb(draw_RenderMap_b, Mem.b(MAPON));          // move.b MAPON,draw_RenderMap_b
 
+            // --- touche pavé Entrée : bascule petit/grand viewport (inverse Temp ; le switch ci-dessous l'applique) ---
+            if (Mem.b(KeyMap_vb + RawKeyMacros.RAWKEY_NUM_ENTER) != 0) { // touche enfoncée
+                if (!fsToggleHeld) {                                     // front montant seulement (anti-répétition)
+                    Mem.wb(Vid_FullScreenTemp_b, Mem.b(Vid_FullScreenTemp_b) == 0 ? 0xFF : 0);
+                    fsToggleHeld = true;
+                }
+            } else {
+                fsToggleHeld = false;
+            }
+
             // --- bascule plein écran ---
             if (((Mem.b(Vid_FullScreenTemp_b) ^ Mem.b(Vid_FullScreen_b)) & 0xFF) != 0) { // eor.b ; beq .noFullscreenSwitch
                 Mem.wb(Vid_FullScreen_b, Mem.b(Vid_FullScreenTemp_b));
@@ -2397,7 +2440,7 @@ public final class Hires {
             }
             // .nopause: --- limiteur FPS (attente VBL) ---
             int fpsLimit = Mem.w(SystemBss_Sys_FPSLimit_w()); // move.w Sys_FPSLimit_w,d2 ; bmi .no_vbl
-            if (fpsLimit >= 0) {
+            if (!headless && fpsLimit >= 0) {                 // headless : jME cadence via frameSync
                 int d2 = (fpsLimit & 0xFFFF) + Mem.l(Vid_VBLCountLast_l); // add.l Vid_VBLCountLast_l,d2
                 while (!(d2 < Mem.l(Vid_VBLCount_l))) {      // .waitvbl: cmp.l Vid_VBLCount_l,d2 ; blt .skipWaitTOF
                     WaitTOF();                               // CALLGRAF WaitTOF
@@ -2447,7 +2490,7 @@ public final class Hires {
             // --- traitement joueur (solo / master / slave) ---
             int mpt = Mem.b(Plr_MultiplayerType_b);
             if (mpt == PLR_SLAVE) {                           // cmp PLR_SLAVE ; beq ASlaveShouldWaitOnHisMaster
-                loop_SlaveBlock();                            // (2 joueurs, série)
+                loop_SlaveBlock(a2);                          // (2 joueurs, lien TCP)
             } else if (mpt == PLR_SINGLE) {                   // cmp PLR_SINGLE ; bne NotOnePlayer
                 // SAVEREGS/GETREGS : ammo affichée
                 int gd0 = Mem.ub(plr_GunSelected_b);          // move.b plr_GunSelected_b,d0
@@ -2469,7 +2512,7 @@ public final class Hires {
                 Mem.wb(a0 + Defs.ObjT_SeePlayer_b, 0);        // move.b #0,ObjT_SeePlayer_b(a0)
                 Mem.wl(PlayerBss.Plr2_ZonePtr_l, BollocksRoom); // move.l #BollocksRoom,Plr2_ZonePtr_l
             } else {                                          // NotOnePlayer (master)
-                loop_MasterBlock();
+                loop_MasterBlock(a2);
             }
 
             // donetalking: tables de luminosité par zone/point
@@ -2525,22 +2568,27 @@ public final class Hires {
             if (mpt == PLR_SLAVE) Plr2_Use(); else Plr1_Use(); // bsr Plr1_Use / Plr2_Use
 
             // IWasPlayer1 / drawplayer2 : préparation de la vue + DrawDisplay
-            if (mpt == PLR_SLAVE) {
-                loop_DrawPlayer2();
-            } else {
-                loop_DrawPlayer1();
-            }
+            // (headless : rendu logiciel du port court-circuité — jME rend en 3D)
+            if (!headless) {
+                if (mpt == PLR_SLAVE) {
+                    loop_DrawPlayer2();
+                } else {
+                    loop_DrawPlayer1();
+                }
 
-            // nodrawp2:
-            if (Mem.b(draw_RenderMap_b) != 0) {              // tst.b draw_RenderMap_b ; beq .nomap
-                ab3d2.modules.draw.DrawMap.DoTheMapWotNastyCharlesIsForcingMeToDo();
+                // nodrawp2:
+                if (Mem.b(draw_RenderMap_b) != 0) {          // tst.b draw_RenderMap_b ; beq .nomap
+                    ab3d2.modules.draw.DrawMap.DoTheMapWotNastyCharlesIsForcingMeToDo();
+                }
             }
             int d5 = (Mem.b(plr1_Teleported_b) | Mem.b(plr2_Teleported_b)) & 0xFF; // or.b
             Mem.wb(ab3d2.modules.C2pData.C2P_Teleporting_b, d5);
             Mem.wb(ab3d2.modules.C2pData.C2P_NeedsInit_b, Mem.b(ab3d2.modules.C2pData.C2P_NeedsInit_b) | d5);
             Mem.wb(plr1_Teleported_b, 0);                     // clr.b plr1_Teleported_b (x2 dans l'original — quirk)
             Mem.wb(plr1_Teleported_b, 0);
-            ab3d2.modules.Draw.Draw_Crosshair();              // jsr Draw_Crosshair
+            if (!headless) {
+                ab3d2.modules.Draw.Draw_Crosshair();          // jsr Draw_Crosshair (rendu logiciel)
+            }
             ab3d2.c.SystemC.Sys_EvalFPS();                    // CALLC Sys_EvalFPS
             DevInst.Dev_MarkDrawDone();                       // CALLDEV MarkDrawDone
             DevInst.Dev_DrawGraph();                          // CALLDEV DrawGraph
@@ -2550,7 +2598,11 @@ public final class Hires {
             if (Mem.l(ab3d2.bss.GameBss.Game_ProgressSignal_l) != 0) { // tst.l ; beq .no_update_progress
                 ab3d2.c.GameProgress.Game_UpdatePlayerProgress();
             }
-            ab3d2.c.ScreenC.Vid_Present();                    // CALLC Vid_Present
+            if (headless) {
+                if (frameSync != null) frameSync.run();       // barrière de frame jME (cadence + lecture état)
+            } else {
+                ab3d2.c.ScreenC.Vid_Present();                // CALLC Vid_Present
+            }
 
             // --- touches de taille d'écran (NUM-/NUM+/F9/F8) ---
             loop_ScreenSizeKeys();
@@ -2901,14 +2953,175 @@ public final class Hires {
         // .not_double_width:
     }
 
-    /** Bloc joueur master (2 joueurs, série) — hires.s 1190-1313. À finaliser (SENDFIRST host). */
-    private static void loop_MasterBlock() {
-        throw new UnsupportedOperationException("hires.s NotOnePlayer (master, série SENDFIRST host)");
+    /**
+     * Bloc joueur MASTER (hires.s NotOnePlayer 1190-1313). Chaque frame : ENVOIE l'état de J1
+     * et REÇOIT celui de J2 via ~11 {@link SerialNightmare#SENDFIRST} (lock-step), puis fait
+     * tourner les deux contrôles. Les longs regroupent parfois 2 valeurs (mot haut/bas) ou 2-3
+     * octets ; les demi-mots « morts » côté réception (jamais relus) sont mis à 0 (état identique).
+     */
+    private static void loop_MasterBlock(int a2) {
+        // a5=KeyMap ; sne Game_MasterPaused_b (P enfoncée → $FF)
+        Mem.wb(Game_MasterPaused_b, Mem.b(KeyMap_vb + RawKeyMacros.RAWKEY_P) != 0 ? 0xFF : 0);
+
+        Mem.ww(ab3d2.bss.DrawBss.draw_DisplayEnergyCount_w, Mem.w(Plr1_Health_w)); // move.w Plr1_Health_w,...
+
+        // SAVEREGS ... munitions J1 affichées ... GETREGS
+        int gd0 = Mem.ub(plr_GunSelected_b);
+        int a6 = Mem.l(GLF_DatabasePtr_l) + Defs.GLFT_ShootDefs_l;
+        gd0 = Mem.w(a6 + gd0 * 8);
+        a6 = PlayerBss.Plr1_AmmoCounts_vw;
+        gd0 = Mem.w(a6 + gd0 * 2);
+        Mem.ww(ab3d2.bss.DrawBss.draw_DisplayAmmoCount_w, gd0);
+
+        SerialNightmare.SENDFIRST(0);                 // jsr SENDFIRST (synchro ; valeur ignorée des 2 côtés)
+
+        loop_FrameClampAndSnapshot1();                // frames clamp + copie Snap→Tmp J1 (1215-1234)
+
+        int r;
+        r = SerialNightmare.SENDFIRST(Mem.l(Plr1_AimSpeed_l));   Mem.wl(Plr2_AimSpeed_l, r);
+        r = SerialNightmare.SENDFIRST(Mem.l(PlayerBss.Plr1_TmpXOff_l));   Mem.wl(PlayerBss.Plr2_TmpXOff_l, r);
+        r = SerialNightmare.SENDFIRST(Mem.l(PlayerBss.Plr1_TmpZOff_l));   Mem.wl(PlayerBss.Plr2_TmpZOff_l, r);
+        r = SerialNightmare.SENDFIRST(Mem.l(PlayerBss.Plr1_TmpYOff_l));   Mem.wl(PlayerBss.Plr2_TmpYOff_l, r);
+        r = SerialNightmare.SENDFIRST(Mem.l(PlayerBss.plr1_TmpHeight_l)); Mem.wl(PlayerBss.plr2_TmpHeight_l, r);
+
+        // AngPos (mot haut) | Bobble (mot bas)
+        int send = ((Mem.w(PlayerBss.Plr1_TmpAngPos_w) & 0xFFFF) << 16) | (Mem.w(PlayerBss.plr1_TmpBobble_w) & 0xFFFF);
+        r = SerialNightmare.SENDFIRST(send);
+        Mem.ww(PlayerBss.plr2_TmpBobble_w, r & 0xFFFF);
+        Mem.ww(PlayerBss.Plr2_TmpAngPos_w, (r >>> 16) & 0xFFFF);
+
+        // TempFrames (mot haut) | SpcTap<<8 | Clicked
+        send = ((Mem.w(Anim_TempFrames_w) & 0xFFFF) << 16)
+             | ((Mem.ub(PlayerBss.Plr1_TmpSpcTap_b) << 8) & 0xFF00) | Mem.ub(PlayerBss.Plr1_TmpClicked_b);
+        r = SerialNightmare.SENDFIRST(send);
+        Mem.wb(PlayerBss.Plr2_TmpClicked_b, r & 0xFF);
+        Mem.wb(Plr2_TmpSpcTap_b, (r >> 8) & 0xFF);
+
+        // Rand1 (mot haut) | (Ducked|Squished)<<8 | GunSelected
+        send = ((Mem.w(ab3d2.ObjectmoveData.Rand1) & 0xFFFF) << 16)
+             | (((Mem.ub(plr1_TmpDucked_b) | Mem.ub(PlayerBss.Plr1_Squished_b)) << 8) & 0xFF00)
+             | Mem.ub(PlayerBss.Plr1_TmpGunSelected_b);
+        r = SerialNightmare.SENDFIRST(send);
+        Mem.wb(PlayerBss.Plr2_TmpGunSelected_b, r & 0xFF);
+        Mem.wb(plr2_TmpDucked_b, (r >> 8) & 0xFF);
+
+        // Fire (mot haut, octet haut) | MasterQuit (mot haut, octet bas) | MasterPaused (octet bas)
+        Mem.wb(Game_SlaveQuit_b, (Mem.b(Game_SlaveQuit_b) | Mem.b(Game_MasterQuit_b)) & 0xFF);       // or.b MasterQuit
+        Mem.wb(Game_SlavePaused_b, (Mem.b(Game_SlavePaused_b) | Mem.b(Game_MasterPaused_b)) & 0xFF); // or.b MasterPaused
+        send = (((Mem.ub(PlayerBss.Plr1_TmpFire_b) << 8) | Mem.ub(Game_MasterQuit_b)) << 16) | Mem.ub(Game_MasterPaused_b);
+        r = SerialNightmare.SENDFIRST(send);
+        Mem.wb(Game_MasterPaused_b, (Mem.b(Game_MasterPaused_b) | (r & 0xFF)) & 0xFF);
+        Mem.wb(Game_SlavePaused_b, (Mem.b(Game_SlavePaused_b) | (r & 0xFF)) & 0xFF);
+        int hi = (r >>> 16) & 0xFFFF;
+        Mem.wb(Game_SlaveQuit_b, (Mem.b(Game_SlaveQuit_b) | (hi & 0xFF)) & 0xFF);
+        Mem.wb(Game_MasterQuit_b, (Mem.b(Game_MasterQuit_b) | (hi & 0xFF)) & 0xFF);
+        Mem.wb(Plr2_TmpFire_b, (hi >> 8) & 0xFF);
+
+        r = SerialNightmare.SENDFIRST(Mem.w(Plr1_Health_w) & 0xFFFF);
+        Mem.ww(Plr2_Health_w, r & 0xFFFF);
+
+        Plr1_Control(a2);                             // bsr Plr1_Control
+        Plr2_Control(a2);                             // bsr Plr2_Control
+        int a0 = Mem.l(PlayerBss.Plr1_ZonePtr_l);
+        Mem.wl(Zone_SplitHeight_l, Mem.l(a0 + Defs.ZoneT_Roof_l));
+        Mem.ww(NewaliencontrolData.THISPLRxoff, Mem.w(PlayerBss.Plr1_TmpXOff_l));
+        Mem.ww(NewaliencontrolData.THISPLRzoff, Mem.w(PlayerBss.Plr1_TmpZOff_l));
     }
 
-    /** Bloc joueur slave (2 joueurs, série) — hires.s 1315-1427. À finaliser (RECFIRST host). */
-    private static void loop_SlaveBlock() {
-        throw new UnsupportedOperationException("hires.s ASlaveShouldWaitOnHisMaster (slave, série RECFIRST host)");
+    /**
+     * Bloc joueur SLAVE (hires.s ASlaveShouldWaitOnHisMaster 1315-1427). Miroir du master :
+     * chaque frame REÇOIT l'état de J1 et ENVOIE celui de J2 via ~11 {@link SerialNightmare#RECFIRST}.
+     * Le slave reçoit du master {@code Anim_TempFrames_w} et {@code Rand1} (déterminisme partagé).
+     */
+    private static void loop_SlaveBlock(int a2) {
+        // a5=KeyMap ; sne Game_SlavePaused_b
+        Mem.wb(Game_SlavePaused_b, Mem.b(KeyMap_vb + RawKeyMacros.RAWKEY_P) != 0 ? 0xFF : 0);
+
+        // SAVEREGS ... munitions J2 affichées (Plr2_AmmoCounts_vw) ... GETREGS
+        int gd0 = Mem.ub(plr_GunSelected_b);
+        int a6 = Mem.l(GLF_DatabasePtr_l) + Defs.GLFT_ShootDefs_l;
+        gd0 = Mem.w(a6 + gd0 * 8);
+        a6 = PlayerBss.Plr2_AmmoCounts_vw;
+        gd0 = Mem.w(a6 + gd0 * 2);
+        Mem.ww(ab3d2.bss.DrawBss.draw_DisplayAmmoCount_w, gd0);
+
+        Mem.ww(ab3d2.bss.DrawBss.draw_DisplayEnergyCount_w, Mem.w(Plr2_Health_w)); // move.w Plr2_Health_w,...
+
+        SerialNightmare.RECFIRST(0);                  // jsr RECFIRST (synchro ; valeur ignorée)
+
+        // Snapshot J2 : Snap→Tmp (PAS de clamp de frames — le slave reçoit TempFrames du master) (1338-1350)
+        Mem.wl(PlayerBss.Plr2_TmpXOff_l, Mem.l(PlayerBss.Plr2_SnapXOff_l));
+        Mem.wl(PlayerBss.Plr2_TmpZOff_l, Mem.l(PlayerBss.Plr2_SnapZOff_l));
+        Mem.wl(PlayerBss.Plr2_TmpYOff_l, Mem.l(PlayerBss.Plr2_SnapYOff_l));
+        Mem.wl(PlayerBss.plr2_TmpHeight_l, Mem.l(PlayerBss.Plr2_SnapHeight_l));
+        Mem.ww(PlayerBss.Plr2_TmpAngPos_w, Mem.w(PlayerBss.Plr2_SnapAngPos_w));
+        Mem.ww(PlayerBss.plr2_TmpBobble_w, Mem.w(PlayerBss.Plr2_Bobble_w));
+        Mem.wb(PlayerBss.Plr2_TmpClicked_b, Mem.b(PlayerBss.Plr2_Clicked_b));
+        Mem.wb(PlayerBss.Plr2_Clicked_b, 0);          // clr.b Plr2_Clicked_b
+        Mem.wb(Plr2_TmpFire_b, Mem.b(PlayerBss.Plr2_Fire_b));
+        Mem.wb(Plr2_TmpSpcTap_b, Mem.b(PlayerBss.Plr2_Used_b));
+        Mem.wb(PlayerBss.Plr2_Used_b, 0);             // clr.b Plr2_Used_b
+        Mem.wb(plr2_TmpDucked_b, Mem.b(PlayerBss.Plr2_Ducked_b));
+        Mem.wb(PlayerBss.Plr2_TmpGunSelected_b, Mem.b(PlayerBss.Plr2_GunSelected_b));
+
+        int r;
+        r = SerialNightmare.RECFIRST(Mem.l(Plr2_AimSpeed_l));    Mem.wl(Plr1_AimSpeed_l, r);
+        r = SerialNightmare.RECFIRST(Mem.l(PlayerBss.Plr2_TmpXOff_l));   Mem.wl(PlayerBss.Plr1_TmpXOff_l, r);
+        r = SerialNightmare.RECFIRST(Mem.l(PlayerBss.Plr2_TmpZOff_l));   Mem.wl(PlayerBss.Plr1_TmpZOff_l, r);
+        r = SerialNightmare.RECFIRST(Mem.l(PlayerBss.Plr2_TmpYOff_l));   Mem.wl(PlayerBss.Plr1_TmpYOff_l, r);
+        r = SerialNightmare.RECFIRST(Mem.l(PlayerBss.plr2_TmpHeight_l)); Mem.wl(PlayerBss.plr1_TmpHeight_l, r);
+
+        // AngPos (mot haut) | Bobble (mot bas)
+        int send = ((Mem.w(PlayerBss.Plr2_TmpAngPos_w) & 0xFFFF) << 16) | (Mem.w(PlayerBss.plr2_TmpBobble_w) & 0xFFFF);
+        r = SerialNightmare.RECFIRST(send);
+        Mem.ww(PlayerBss.plr1_TmpBobble_w, r & 0xFFFF);
+        Mem.ww(PlayerBss.Plr1_TmpAngPos_w, (r >>> 16) & 0xFFFF);
+
+        // SpcTap<<8 | Clicked ; le slave récupère TempFrames (mot haut) du master
+        send = ((Mem.ub(Plr2_TmpSpcTap_b) << 8) & 0xFF00) | Mem.ub(PlayerBss.Plr2_TmpClicked_b);
+        r = SerialNightmare.RECFIRST(send);
+        Mem.wb(PlayerBss.Plr1_TmpClicked_b, r & 0xFF);
+        Mem.wb(PlayerBss.Plr1_TmpSpcTap_b, (r >> 8) & 0xFF);
+        Mem.ww(Anim_TempFrames_w, (r >>> 16) & 0xFFFF);
+
+        // (Ducked|Squished)<<8 | GunSelected ; le slave récupère Rand1 (mot haut) du master
+        send = (((Mem.ub(plr2_TmpDucked_b) | Mem.ub(PlayerBss.Plr2_Squished_b)) << 8) & 0xFF00)
+             | Mem.ub(PlayerBss.Plr2_TmpGunSelected_b);
+        r = SerialNightmare.RECFIRST(send);
+        Mem.wb(PlayerBss.Plr1_TmpGunSelected_b, r & 0xFF);
+        Mem.wb(plr1_TmpDucked_b, (r >> 8) & 0xFF);
+        Mem.ww(ab3d2.ObjectmoveData.Rand1, (r >>> 16) & 0xFFFF);
+
+        // Fire (mot haut, octet haut) | SlaveQuit (mot haut, octet bas) | SlavePaused (octet bas)
+        Mem.wb(Game_MasterQuit_b, (Mem.b(Game_MasterQuit_b) | Mem.b(Game_SlaveQuit_b)) & 0xFF);       // or.b SlaveQuit
+        Mem.wb(Game_MasterPaused_b, (Mem.b(Game_MasterPaused_b) | Mem.b(Game_SlavePaused_b)) & 0xFF); // or.b SlavePaused
+        send = (((Mem.ub(Plr2_TmpFire_b) << 8) | Mem.ub(Game_SlaveQuit_b)) << 16) | Mem.ub(Game_SlavePaused_b);
+        r = SerialNightmare.RECFIRST(send);
+        Mem.wb(Game_MasterPaused_b, (Mem.b(Game_MasterPaused_b) | (r & 0xFF)) & 0xFF);
+        Mem.wb(Game_SlavePaused_b, (Mem.b(Game_SlavePaused_b) | (r & 0xFF)) & 0xFF);
+        int hi = (r >>> 16) & 0xFFFF;
+        Mem.wb(Game_SlaveQuit_b, (Mem.b(Game_SlaveQuit_b) | (hi & 0xFF)) & 0xFF);
+        Mem.wb(Game_MasterQuit_b, (Mem.b(Game_MasterQuit_b) | (hi & 0xFF)) & 0xFF);
+        Mem.wb(PlayerBss.Plr1_TmpFire_b, (hi >> 8) & 0xFF);
+
+        r = SerialNightmare.RECFIRST(Mem.w(Plr2_Health_w) & 0xFFFF);
+        Mem.ww(Plr1_Health_w, r & 0xFFFF);
+
+        Plr1_Control(a2);                             // bsr Plr1_Control
+        Plr2_Control(a2);                             // bsr Plr2_Control
+        // THISPLR = cible de pathing des aliens (FindCloseRoom). L'IA cible Plr1 PARTOUT ailleurs
+        // (Plr1_XOff, synchronisé). En VERSUS l'ASM met Plr2 ici (fidèle), mais il n'y a pas d'aliens.
+        // En CO-OP on aligne sur Plr1 des DEUX côtés → FindCloseRoom cohérent → aliens déterministes
+        // (sinon les aliens iraient vers Plr2 côté slave / Plr1 côté master = désync).
+        if (Controlloop.coopMode) {
+            Mem.ww(NewaliencontrolData.THISPLRxoff, Mem.w(PlayerBss.Plr1_TmpXOff_l));
+            Mem.ww(NewaliencontrolData.THISPLRzoff, Mem.w(PlayerBss.Plr1_TmpZOff_l));
+        } else {
+            Mem.ww(NewaliencontrolData.THISPLRxoff, Mem.w(PlayerBss.Plr2_TmpXOff_l)); // move.w Plr2_TmpXOff_l,THISPLRxoff
+            Mem.ww(NewaliencontrolData.THISPLRzoff, Mem.w(PlayerBss.Plr2_TmpZOff_l));
+        }
+        int a0 = Mem.l(PlayerBss.Plr2_ZonePtr_l);
+        Mem.wl(Zone_SplitHeight_l, Mem.l(a0 + Defs.ZoneT_Roof_l));
     }
 
     /** Garde-fou hôte : borne les boucles d'attente musique de fin. Les modules gameover/
@@ -4487,8 +4700,95 @@ public final class Hires {
      * appelée par game_main_loop). Compteurs + .routine : si Game_Running -> dosomething
      * (anim/physique/entrée/son), sinon JUSTSOUNDS.
      */
+    /**
+     * DIAG — releve les SURFACES reellement dessinees dans une zone, sur une frame donnee.
+     * {@code -PgeomZone=<zone> -PgeomFrame=<frame>} sur levelTest. Sert a comparer, surface par
+     * surface, ce que le port met a l'ecran pour une porte et ce que le remake en construit.
+     */
+    public static int dbgGeomZone = -1;
+    public static long dbgGeomFrame = -1;
+
+    /** Vrai si la frame courante est celle qu'on releve pour la zone {@code zone}. */
+    public static boolean dbgGeomHit(int zone) {
+        return dbgGeomZone >= 0 && zone == dbgGeomZone
+                && Mem.l(Vid_VBLCount_l) == dbgGeomFrame;
+    }
+
+    /** DIAG : maintient la touche AVANCER, pour declencher les portes a proximite. */
+    public static boolean dbgWalk;
+
+    /** DIAG : releve la position et l'angle du joueur toutes les N frames (0 = desactive). */
+    public static int dbgPlayerTraceEvery;
+    private static long dbgPlayerFrame;
+
+    /**
+     * DIAG — imprime la CAMERA du joueur, pour pouvoir rejouer exactement le meme point de vue
+     * dans le remake et comparer les deux rendus image contre image.
+     * Format : {@code CAM f=<frame> x=<x> z=<z> zone=<zone> ang=<angle> aim=<visee verticale>}.
+     * Active par {@code -PplayerTrace=<periode en frames>} sur levelTest.
+     */
+    private static void dbgPlayerTrace() {
+        if (dbgPlayerTraceEvery <= 0) {
+            return;
+        }
+        if (dbgPlayerFrame++ % dbgPlayerTraceEvery != 0) {
+            return;
+        }
+        System.out.printf("CAM f=%d x=%d z=%d zone=%d ang=%d aim=%d verrous=0x%04X%n",
+                dbgPlayerFrame - 1,
+                Mem.w(PlayerBss.Plr1_XOff_l), Mem.w(PlayerBss.Plr1_ZOff_l),
+                Mem.w(PlayerBss.Plr1_Zone_w), Mem.uw(PlayerBss.Plr1_AngPos_w),
+                Mem.l(PlayerBss.Plr1_AimSpeed_l),
+                Mem.uw(ab3d2.bss.AnimBss.Anim_DoorAndLiftLocks_l));
+    }
+
+    /** DIAG : si >= 0, trace l'état des N premiers aliens à chaque frame (voir dbgAiTrace). */
+    public static int dbgAiAliens = -1;
+    private static int dbgAiFrame;
+
+    /**
+     * DIAG — trace l'IA, pour comparer le comportement des aliens avec celui du remake.
+     * Une ligne par frame et par alien : {@code AI f=<frame> i=<index> x z zone mode anim cpt tgt}.
+     * Activé par {@code -PaiTrace=<nombre d'aliens>} sur levelTest.
+     */
+    private static void dbgAiTrace() {
+        if (dbgAiAliens < 0) {
+            return;
+        }
+        int objData = Mem.l(ab3d2.bss.LevelBss.Lvl_ObjectDataPtr_l);
+        int objPts = Mem.l(ab3d2.bss.LevelBss.Lvl_ObjectPointsPtr_l);
+        int a0 = objData - ab3d2.Defs.ObjT_SizeOf_l;
+        int seen = 0;
+        for (int n = 0; n < 2000 && seen < dbgAiAliens; n++) {
+            a0 += ab3d2.Defs.ObjT_SizeOf_l;
+            int pidx = Mem.w(a0);
+            if (pidx < 0) {
+                break;
+            }
+            if (Mem.ub(a0 + ab3d2.Defs.ObjT_TypeID_b) != 0) {
+                continue;                                    // seuls les ALIENS
+            }
+            System.out.printf("AI f=%d i=%d x=%d z=%d zone=%d mode=%d anim=%d cpt=%d tgt=%d"
+                            + " t1=%d t2=%d see=%d hp=%d%n",
+                    dbgAiFrame, seen,
+                    Mem.w(objPts + pidx * 8), Mem.w(objPts + pidx * 8 + 4),
+                    Mem.w(a0 + ab3d2.Defs.ObjT_ZoneID_w),
+                    Mem.ub(a0 + ab3d2.Defs.EntT_CurrentMode_b),
+                    Mem.ub(a0 + ab3d2.Defs.EntT_WhichAnim_b),
+                    Mem.w(a0 + ab3d2.Defs.EntT_CurrentControlPoint_w),
+                    Mem.w(a0 + ab3d2.Defs.EntT_TargetControlPoint_w),
+                    Mem.w(a0 + ab3d2.Defs.EntT_Timer1_w),
+                    Mem.w(a0 + ab3d2.Defs.EntT_Timer2_w),
+                    Mem.ub(a0 + ab3d2.Defs.ObjT_SeePlayer_b),
+                    Mem.ub(a0 + ab3d2.Defs.EntT_HitPoints_b));
+            seen++;
+        }
+        dbgAiFrame++;
+    }
+
     public static int dbgTestSfx = -1;  // DIAG : si >=0, injecte ce sample SFX ~1×/s (test chemin SFX)
     public static boolean dbgForceFire = false; // DIAG : simule le clic gauche (tir) chaque frame
+    public static boolean dbgForceWalk = false; // DIAG : maintient « avancer » (aggro aliens ; test 2J)
     public static boolean dbgWeaponTest = false; // DIAG : cycle les 10 armes (15 frames chacune) + tir
     public static final int DBG_FRAMES_PER_GUN = 8;
     public static boolean dbgSwitchTest = false; // DIAG : simule la droite souris (changement d'arme)
@@ -4516,6 +4816,7 @@ public final class Hires {
             ab3d2.host.CustomChips.mouseLeftPressed = (vbl % DBG_FRAMES_PER_GUN) < 2;
         }
         if (dbgForceFire) ab3d2.host.CustomChips.mouseLeftPressed = true; // simule clic gauche (batch)
+        if (dbgForceWalk) Mem.wb(ab3d2.bss.TablesBss.KeyMap_vb + ab3d2.modules.RawKeyMacros.RAWKEY_W, 0xFF); // DIAG : avance forcée
         Mem.wl(Vid_VBLCount_l, Mem.l(Vid_VBLCount_l) + 1);   // addq.l #1,Vid_VBLCount_l
         Mem.ww(ab3d2.bss.AnimBss.Anim_Timer_w, Mem.w(ab3d2.bss.AnimBss.Anim_Timer_w) - 1); // subq.w #1,Anim_Timer_w
         if (dbgTestSfx >= 0 && (Mem.l(Vid_VBLCount_l) % 50) == 10) { // DIAG : déclenche un SFX de test

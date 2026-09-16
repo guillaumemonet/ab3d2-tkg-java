@@ -1,24 +1,32 @@
-# Sorties de build Gradle
+# --- Ce depot ne versionne QUE le portage java/ ---
+# rebirth/ (extraction des assets + remake jME) vit a cote, hors depot.
+/rebirth/
+
+# --- Sorties de build Gradle ---
 /java/build/
 /java/.gradle/
 /java/bin/
 
-# État runtime (préférences, sauvegardes, stats, logs) généré à l'exécution
+# --- Assets ---
+# Aucun asset du jeu n'est versionne : les originaux sont lus dans les ADF
+# (dossier adf/, hors depot).
+
+# --- Etat runtime (preferences, sauvegardes, stats, journaux) ---
 /run/
 
-# Captures / diagnostics générés par les harnais (workingDir = racine du projet)
+# --- Captures et diagnostics generes par les harnais ---
 /*.png
 *.stackdump
 
-# Fichiers parasites
+# --- Fichiers parasites ---
 /9
 /affichage
 
-# IDE
+# --- IDE ---
 /.idea/
 *.iml
 /nbproject/private/
 
-# OS
+# --- OS ---
 .DS_Store
 Thumbs.db

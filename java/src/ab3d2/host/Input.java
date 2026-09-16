@@ -126,6 +126,7 @@ public final class Input {
             case GLFW_KEY_DOWN:  return RAWKEY_DOWN;
             case GLFW_KEY_SPACE: return RAWKEY_SPACEBAR;  // jump / valider menu
             case GLFW_KEY_ENTER: return RAWKEY_ENTER;     // valider menu
+            case GLFW_KEY_KP_ENTER: return RAWKEY_NUM_ENTER; // pavé Entrée = bascule plein écran
             case GLFW_KEY_LEFT_CONTROL:
             case GLFW_KEY_RIGHT_CONTROL: return RAWKEY_CTRL; // fire
             case GLFW_KEY_LEFT_SHIFT:  return RAWKEY_LSHIFT;  // run

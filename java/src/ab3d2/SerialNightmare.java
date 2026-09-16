@@ -23,14 +23,17 @@ public final class SerialNightmare {
     // Primitives série Paula — couche hôte (serdat/serdatr/intreq). Stubs.
     // ------------------------------------------------------------------
 
-    /** SERSEND : envoie l'octet bas de d1 sur le port série (+ bit stop). Host. */
+    /**
+     * SERSEND : envoie l'octet bas de d1 sur le lien. Le transport série Paula (serdat + bit
+     * stop) est remplacé par une socket TCP ({@link ab3d2.host.SerialLink}) — cf. plan 2 joueurs.
+     */
     public static void SERSEND(int d1) {
-        throw new UnsupportedOperationException("serial_nightmare.s::SERSEND (série Paula hôte, à implémenter)");
+        ab3d2.host.SerialLink.sendByte(d1);
     }
 
-    /** SERREC : attend et renvoie un octet du port série (octet bas). Host. */
+    /** SERREC : attend (bloquant) et renvoie un octet du pair (octet bas), via {@link ab3d2.host.SerialLink}. */
     public static int SERREC() {
-        throw new UnsupportedOperationException("serial_nightmare.s::SERREC (série Paula hôte, à implémenter)");
+        return ab3d2.host.SerialLink.recvByte();
     }
 
     // ------------------------------------------------------------------

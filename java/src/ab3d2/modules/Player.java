@@ -53,6 +53,8 @@ public final class Player {
     // TEST (harnais) : override du spawn J1. dbgSpawnZone<0 → désactivé.
     // dbgSpawnX/Z = coordonnées MONDE (word), placées dans le mot fort de Plr1_XOff/ZOff.
     public static int dbgSpawnZone = -1, dbgSpawnX, dbgSpawnZ;
+    /** DIAG : angle de depart force (unites de la table sinus), -1 = celui du niveau. */
+    public static int dbgSpawnAng = -1;
 
     // ******************************************************************************
     // * Initialise player positions
@@ -93,6 +95,10 @@ public final class Player {
             Mem.ww(PlayerBss.Plr1_XOff_l, dbgSpawnX);
             Mem.ww(PlayerBss.Plr1_SnapZOff_l, dbgSpawnZ);
             Mem.ww(PlayerBss.Plr1_ZOff_l, dbgSpawnZ);
+            if (dbgSpawnAng >= 0) {                    // DIAG : oriente la vue (comparaison remake)
+                Mem.ww(PlayerBss.Plr1_AngPos_w, dbgSpawnAng);
+                Mem.ww(PlayerBss.Plr1_SnapAngPos_w, dbgSpawnAng);
+            }
         }
 
         // player 2

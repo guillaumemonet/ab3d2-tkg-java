@@ -961,6 +961,14 @@ public final class Hireswall {
 
     /** Draw_Wall — a0 = flux zone-graph (record de mur) ; renvoie a0 avancé. */
     public static int Draw_Wall(int a0) {
+        if (ab3d2.Hires.dbgGeomHit(Mem.w(ab3d2.bss.DrawBss.Draw_CurrentZone_w))) {
+            // a0 pointe le record de mur : top@18, bottom@22 (.8), yOffset@10.
+            System.out.printf("GEOM zone=%d MUR pts=%d,%d top=%d bottom=%d yOff=%d"
+                            + " (monde %.2f a %.2f)%n",
+                    Mem.w(ab3d2.bss.DrawBss.Draw_CurrentZone_w), Mem.uw(a0), Mem.uw(a0 + 2),
+                    Mem.l(a0 + 18) >> 8, Mem.l(a0 + 22) >> 8, Mem.uw(a0 + 10),
+                    -(Mem.l(a0 + 18) >> 8) / 32.0, -(Mem.l(a0 + 22) >> 8) / 32.0);
+        }
         int a5 = Rotated_vl;                           // move.l #Rotated_vl,a5
         int a6 = OnScreen_vl;                          // move.l #OnScreen_vl,a6
 

@@ -213,6 +213,9 @@ public final class LevelTest {
                 ab3d2.modules.Player.dbgSpawnX = Integer.parseInt(sp[0]);
                 ab3d2.modules.Player.dbgSpawnZ = Integer.parseInt(sp[1]);
                 ab3d2.modules.Player.dbgSpawnZone = Integer.parseInt(sp[2]);
+                if (sp.length > 3) {                   // "X Z zone ANGLE"
+                    ab3d2.modules.Player.dbgSpawnAng = Integer.parseInt(sp[3]);
+                }
                 System.out.println("[LevelTest] spawn relocalisé : X=" + sp[0] + " Z=" + sp[1] + " zone=" + sp[2]);
             }
             if (System.getProperty("fullScreen") != null) { // test : force le mode (1=plein écran, 0=petit écran HUD)
@@ -287,9 +290,92 @@ public final class LevelTest {
                 ab3d2.Objdrawhires.dbgForceFrame = Integer.parseInt(System.getProperty("forceFrame"));
                 System.out.println("[LevelTest] frame du modèle 11 forcée à " + ab3d2.Objdrawhires.dbgForceFrame);
             }
+            if (System.getProperty("geomZone") != null) {    // DIAG : releve les surfaces dessinees
+                Hires.dbgGeomZone = Integer.parseInt(System.getProperty("geomZone"));
+                Hires.dbgGeomFrame = Long.parseLong(System.getProperty("geomFrame", "45"));
+            }
+            if ("1".equals(System.getProperty("walk"))) {    // DIAG : avance (ouvre les portes)
+                Hires.dbgWalk = true;
+            }
+            if (System.getProperty("playerTrace") != null) { // DIAG : releve la camera du joueur
+                Hires.dbgPlayerTraceEvery = Integer.parseInt(System.getProperty("playerTrace"));
+            }
+            if (System.getProperty("aiTrace") != null) {     // DIAG : trace l'IA (cf. Hires.dbgAiTrace)
+                Hires.dbgAiAliens = Integer.parseInt(System.getProperty("aiTrace"));
+            }
             System.out.println("[LevelTest] Game_Begin (niveau " + level + ", " + frames + " frames)...");
             Hires.Game_Begin();
             System.out.println("[LevelTest] Game_Begin terminé.");
+            if (System.getProperty("dumpWallTex") != null) { // DIAG Phase 2b : décodage texture murale → PNG
+                int N = Integer.parseInt(System.getProperty("dumpWallTex"));
+                int glf = Mem.l(GLF_DatabasePtr_l);
+                int base = Mem.l(ab3d2.bss.DrawBss.Draw_GlobalWallTexturePtrs_vl + N * 4);
+                int H = Mem.uw(glf + ab3d2.Defs.GLFT_WallHeights_l + N * 2);
+                int nameAddr = glf + ab3d2.Defs.GLFT_WallGFXNames_l + N * 64;
+                String name = Mem.cstr(nameAddr);
+                long fr = FileIo.IO_LoadFile(nameAddr);
+                int flen = FileIo.len(fr);
+                int chunkLen = flen - 2048;
+                int W = (H > 0 && chunkLen > 0) ? (chunkLen / 2) / H : 0;  // texels stride 2
+                System.out.println("[dumpWallTex] " + N + " '" + name + "' base@" + base
+                        + " len=" + flen + " H=" + H + " → W=" + W + " (chunkLen=" + chunkLen + ")");
+                if (base != 0 && H > 0 && W > 0) {
+                    int pal = ab3d2.data.DrawData.draw_Palette_vw;
+                    int[] rgb = new int[256];
+                    for (int i = 0; i < 256; i++) {
+                        int rr = Mem.uw(pal + (i * 3) * 2) & 0xFF, gg = Mem.uw(pal + (i * 3 + 1) * 2) & 0xFF,
+                            bb = Mem.uw(pal + (i * 3 + 2) * 2) & 0xFF;
+                        rgb[i] = 0xFF000000 | (rr << 16) | (gg << 8) | bb;
+                    }
+                    int shade = base;            // a4 = Draw_PalettePtr (table shade 32×32, stride 2)
+                    int texels = base + 2048;    // a5 = Draw_ChunkPtr (texels stride 2)
+                    W = 64; H = 64;
+                    java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(W, H, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                    for (int u = 0; u < W; u++) {
+                        for (int v = 0; v < H; v++) {
+                            int tw = Mem.uw(texels + (u * H + v) * 2);  // mot texel
+                            int sr = (tw >> 5) & 31;                    // sélecteur de rampe (PACK1G)
+                            int vblk = Integer.getInteger("vblk", 512); // bloc V fixe (luminosité) : texture plate
+                            int idx = Mem.ub(shade + ((vblk + sr) & 1023) * 2);
+                            img.setRGB(u, v, rgb[idx]);
+                        }
+                    }
+                    try { javax.imageio.ImageIO.write(img, "png", new java.io.File("wall_tex_" + N + ".png")); } catch (Exception e) {}
+                    System.out.println("[dumpWallTex] écrit wall_tex_" + N + ".png (" + W + "x" + H + ")");
+                }
+            }
+            if (System.getProperty("dumpGeom") != null) {  // DIAG Phase 2 : géométrie secteurs
+                int nz = Mem.uw(ab3d2.bss.LevelBss.Lvl_NumZones_w);
+                int zptrs = Mem.l(ab3d2.bss.LevelBss.Lvl_ZonePtrsPtr_l);
+                int edgeBase = Mem.l(ab3d2.bss.LevelBss.Lvl_ZoneEdgePtr_l);
+                System.out.println("[dumpGeom] NumZones=" + nz + " ZonePtrs@" + zptrs + " EdgeBase@" + edgeBase);
+                int show = Math.min(nz, Integer.parseInt(System.getProperty("dumpGeom")));
+                for (int z = 0; z < show; z++) {
+                    int zn = Mem.l(zptrs + z * 4);
+                    if (zn == 0) { System.out.println("  zone " + z + " : (null)"); continue; }
+                    int floor = Mem.l(zn + ab3d2.Defs.ZoneT_Floor_l);
+                    int roof = Mem.l(zn + ab3d2.Defs.ZoneT_Roof_l);
+                    int ufloor = Mem.l(zn + ab3d2.Defs.ZoneT_UpperFloor_l);
+                    int uroof = Mem.l(zn + ab3d2.Defs.ZoneT_UpperRoof_l);
+                    int bright = Mem.uw(zn + ab3d2.Defs.ZoneT_Brightness_w);
+                    int pts = Mem.uw(zn + ab3d2.Defs.ZoneT_Points_w);
+                    int elist = zn + (short) Mem.uw(zn + ab3d2.Defs.ZoneT_EdgeListOffset_w);
+                    System.out.printf("  zone %d: Floor=%d Roof=%d UFloor=%d URoof=%d bright=%d points=%d%n",
+                            z, floor, roof, ufloor, uroof, bright, pts);
+                    StringBuilder sb = new StringBuilder("    arêtes: ");
+                    for (int i = 0; i < 24; i++) {
+                        int ei = Mem.w(elist + i * 2);
+                        if (ei < 0) break;
+                        int e = edgeBase + (ei << 4);
+                        int x = Mem.w(e + ab3d2.Defs.EdgeT_XPos_w), zz = Mem.w(e + ab3d2.Defs.EdgeT_ZPos_w);
+                        int xl = Mem.w(e + ab3d2.Defs.EdgeT_XLen_w), zl = Mem.w(e + ab3d2.Defs.EdgeT_ZLen_w);
+                        int jz = Mem.w(e + ab3d2.Defs.EdgeT_JoinZone_w);
+                        int w5 = Mem.uw(e + 10), b12 = Mem.ub(e + 12), b13 = Mem.ub(e + 13), fl = Mem.uw(e + 14);
+                        sb.append(String.format("[#%d (%d,%d)+(%d,%d) join=%d w5=%d b12=%d b13=%d fl=%d] ", ei, x, zz, xl, zl, jz, w5, b12, b13, fl));
+                    }
+                    System.out.println(sb);
+                }
+            }
             if (System.getProperty("animDump") != null) { // DIAG : anim DEFANIMOBJ d'un def objet
                 int def = Integer.parseInt(System.getProperty("animDump"));
                 int glfb = Mem.l(GLF_DatabasePtr_l);
@@ -381,6 +467,20 @@ public final class LevelTest {
                     System.out.printf("    idx=%3d ×%-4d  R=%3d G=%3d B=%3d%n",
                         e.getKey(), e.getValue(), (argb>>16)&0xFF, (argb>>8)&0xFF, argb&0xFF);
                 });
+            }
+            if (System.getProperty("dumpBrights") != null) {  // DIAG : luminosites de points calculees
+                int zone = Integer.parseInt(System.getProperty("dumpBrights"));
+                int cur = ab3d2.bss.TablesBss.CurrentPointBrights_vl;
+                int raw = Mem.l(ab3d2.bss.TablesBss.PointBrightsPtr_l);
+                StringBuilder sb = new StringBuilder("[dumpBrights] zone " + zone + " brut : ");
+                for (int i = 0; i < 40; i++) sb.append(Mem.w(raw + (zone * 40 + i) * 2)).append(' ');
+                System.out.println(sb);
+                sb = new StringBuilder("[dumpBrights] zone " + zone + " calcule : ");
+                for (int i = 0; i < 40; i++) sb.append(Mem.w(cur + (zone * 40 + i) * 2)).append(' ');
+                System.out.println(sb);
+                sb = new StringBuilder("[dumpBrights] Anim_BrightTable : ");
+                for (int i = 0; i < 16; i++) sb.append(Mem.w(ab3d2.bss.AnimBss.Anim_BrightTable_vw + i * 2)).append(' ');
+                System.out.println(sb);
             }
             if (System.getProperty("wavOut") != null) ab3d2.host.Audio.dumpWav(System.getProperty("wavOut"));
             ScreenC.saveScreenshot("level_screenshot.png");

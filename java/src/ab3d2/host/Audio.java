@@ -31,6 +31,9 @@ public final class Audio {
     private static final int NUM_BUFFERS = 8;         // pool de buffers OpenAL
     private static final int TARGET_QUEUED = 4;       // profondeur de file visée
 
+    /** Désactive complètement l'audio (ex. moteur jME : OpenAL piloté ailleurs). */
+    public static boolean disabled = false;
+
     private static boolean started;
     private static boolean running;                   // false si pas de périphérique
     private static long device;
@@ -45,6 +48,9 @@ public final class Audio {
 
     /** Initialise OpenAL une fois. Renvoie true si l'audio est opérationnel. */
     public static boolean ensureStarted() {
+        if (disabled) {
+            return false;
+        }
         if (started) {
             return running;
         }
@@ -139,6 +145,11 @@ public final class Audio {
         pcm.flip();
 
         int rate = 3546895 / refPer;                      // fréquence de sortie = horloge PAL / période SFX
+        // GARDE-FOU : une période Paula transitoire minuscule (1-2) ferait exploser le rate
+        // (jusqu'à ~3,5 MHz) → OpenAL alloue un buffer interne démesuré → STACK_BUFFER_OVERRUN natif
+        // (crash 0xC0000409 observé après un temps de jeu). On borne à une plage audio saine.
+        if (rate < 1000) rate = 1000;
+        else if (rate > 48000) rate = 48000;
 
         int buf = freePool[--freeCount];
         alBufferData(buf, AL_FORMAT_STEREO16, pcm, rate);
@@ -147,6 +158,9 @@ public final class Audio {
         if (alGetSourcei(source, AL_SOURCE_STATE) != AL_PLAYING) {
             alSourcePlay(source);
         }
+        // Vidange défensive : ne jamais laisser une erreur OpenAL s'accumuler entre trames
+        // (un état natif corrompu qui persiste finit en crash). alGetError() efface le drapeau.
+        alGetError();
     }
 
     /**

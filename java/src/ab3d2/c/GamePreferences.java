@@ -122,7 +122,8 @@ public final class GamePreferences {
      */
     public static void Cfg_ParsePreferencesFile(int file) {
         int h = ab3d2.host.DosLib.Open(file, ab3d2.host.DosLib.MODE_OLDFILE);
-        if (h == 0) {                                        // pas de fichier → défauts
+        if (h == 0) {                                        // pas de fichier → applique les défauts Prefs_*
+            game_ApplyPreferences();                         // cible 68060/RTG : plein écran par défaut préservé
             return;
         }
         int size = PrefsfileEnd - Prefsfile;

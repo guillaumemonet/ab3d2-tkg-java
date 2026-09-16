@@ -299,6 +299,10 @@ public final class ScreenC {
      * 4 px ← src[pos+offA], 4 px ← src[pos+4+offB] (offA = mot, offB = mot bas du long suivant).
      * La table avance +6 octets/groupe et s'enroule mod 512 par ligne ; la frame indexe le
      * bloc (frame<<10). Le bit-shuffle planar de l'original est omis (on reste chunky).
+     *
+     * <p>Le pointeur SOURCE avance de 8 par groupe ({@code addq #8,a0}), apres les deux lectures :
+     * les decalages de la table sont donc RELATIFS au groupe courant, pas au debut de la ligne.
+     * (Cet {@code addq} manquait : l'ecran se reduisait a des trainees horizontales.)
      */
     private static void applyTeleportShimmer(int srcChunky, int dstChunky, int frame) {
         byte[] ram = Mem.RAM;
@@ -317,6 +321,7 @@ public final class ScreenC {
                 int o = d + g * 8;
                 for (int i = 0; i < 4; i++) ram[o + i] = ram[clampIdx(srcA + i, srcChunky, total)];
                 for (int i = 0; i < 4; i++) ram[o + 4 + i] = ram[clampIdx(srcB + i, srcChunky, total)];
+                a0 += 8;                                     // addq #8,a0 (APRES les deux lectures)
             }
             a6Off &= 0x1FE;                                  // and.l #255*2 : enroulement par ligne
         }

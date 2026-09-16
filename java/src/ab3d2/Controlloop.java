@@ -18,6 +18,11 @@ import static ab3d2.data.MenunbData.mnu_MYLEVELMENU2;
 import static ab3d2.data.MenunbData.mnu_currentsel;
 import static ab3d2.data.MenunbData.mnu_row;
 import static ab3d2.data.MenunbData.mnu_CURRENTLEVELLINE;
+import static ab3d2.data.MenunbData.mnu_MYMASTERMENU;
+import static ab3d2.data.MenunbData.mnu_CURRENTLEVELLINEM;
+import static ab3d2.data.MenunbData.mnu_MASTERMODELINE;
+import static ab3d2.data.MenunbData.mnu_MYSLAVEMENU;
+import static ab3d2.ControlloopData.game_LevelSelected_w;
 import static ab3d2.data.MenunbData.mnu_LevelAName_vb;
 import static ab3d2.data.MenunbData.mnu_LevelIName_vb;
 import static ab3d2.data.MenunbData.mnu_MYCUSTOMOPTSMENU;
@@ -88,6 +93,14 @@ public final class Controlloop {
     private static final int PLR_SINGLE = 'n';
     private static final int PLR_MASTER = 'm';
     private static final int PLR_SLAVE = 's';
+
+    /**
+     * Mode 2 joueurs : {@code false} = VERSUS (deathmatch fidèle à ab3d2_source : pas d'aliens,
+     * portes déverrouillées) ; {@code true} = CO-OP (restaure le jeu à deux contre les ennemis
+     * de la version finale : aliens + portes à clé actifs). Choisi par le MASTER (menu ou
+     * propriété {@code ab3d2.coop}) et transmis au slave par le handshake (synchro déterministe).
+     */
+    public static boolean coopMode = Boolean.getBoolean("ab3d2.coop");
 
     private Controlloop() {
     }
@@ -190,17 +203,69 @@ public final class Controlloop {
     }
 
     // ------------------------------------------------------------------
-    // Init 2 joueurs — lien SÉRIE (serial_nightmare.s, non porté) → stubs.
+    // Init 2 joueurs — handshake de départ sur le lien TCP (SerialNightmare/SerialLink).
+    // Le master IMPOSE le n° de niveau et la graine RNG (Rand1) au slave → sims identiques.
     // ------------------------------------------------------------------
 
-    /** Plr_InitMaster : envoie niveau+graine via série puis TWOPLAYER. */
+    /** Plr_InitMaster : envoie n° de niveau + graine (Rand1) + mode au slave, puis TWOPLAYER. */
     public static void Plr_InitMaster() {
-        throw new UnsupportedOperationException("controlloop.s::Plr_InitMaster (lien série 2J : SENDFIRST/serial_nightmare.s)");
+        ensureMasterLink();                                 // établit le lien TCP (écoute) si pas déjà connecté
+        // VERSUS (fidèle) : AI_NoEnemies_b=0 → aliens supprimés + portes déverrouillées.
+        // CO-OP (restauré) : AI_NoEnemies_b=$FF → aliens + verrous de porte actifs (jeu à deux).
+        Mem.wb(AI_NoEnemies_b, coopMode ? 0xFF : 0);
+        SerialNightmare.SENDFIRST(Mem.w(Game_LevelNumber_w)); // move.w Game_LevelNumber_w,d0 ; jsr SENDFIRST
+        SerialNightmare.SENDFIRST(Mem.w(ObjectmoveData.Rand1)); // move.w Rand1,d0 ; jsr SENDFIRST
+        SerialNightmare.SENDFIRST(coopMode ? 1 : 0);        // transmet le mode au slave (ajout : synchro déterministe)
+        TWOPLAYER();                                        // bsr TWOPLAYER
     }
 
-    /** Plr_InitSlave : reçoit niveau+graine via série puis TWOPLAYER. */
+    /**
+     * Établit le lien 2 joueurs (transport TCP, absent de l'ASM = câble physique).
+     * MASTER = écoute, SLAVE = se connecte. Hôte/port : propriétés {@code ab3d2.netHost}
+     * (défaut localhost) / {@code ab3d2.netPort} (défaut {@link ab3d2.host.SerialLink#DEFAULT_PORT}).
+     * Ne fait rien si le lien est déjà ouvert (réutilisé d'un niveau à l'autre).
+     */
+    private static void ensureMasterLink() {
+        if (ab3d2.host.SerialLink.isConnected()) return;
+        int port = Integer.getInteger("ab3d2.netPort", ab3d2.host.SerialLink.DEFAULT_PORT);
+        try {
+            System.out.println("[2P] MASTER : écoute sur le port " + port + " — en attente du slave…");
+            ab3d2.host.SerialLink.startMaster(port, 120_000);
+            System.out.println("[2P] MASTER : slave connecté.");
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("lien 2 joueurs (master) : " + e.getMessage(), e);
+        }
+    }
+
+    private static void ensureSlaveLink() {
+        if (ab3d2.host.SerialLink.isConnected()) return;
+        String host = System.getProperty("ab3d2.netHost", "localhost");
+        int port = Integer.getInteger("ab3d2.netPort", ab3d2.host.SerialLink.DEFAULT_PORT);
+        try {
+            System.out.println("[2P] SLAVE : connexion à " + host + ":" + port + "…");
+            ab3d2.host.SerialLink.startSlave(host, port, 120_000);
+            System.out.println("[2P] SLAVE : connecté au master.");
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("lien 2 joueurs (slave) : " + e.getMessage(), e);
+        }
+    }
+
+    /** Plr_InitSlave : reçoit n° de niveau + graine (Rand1) + mode du master, puis TWOPLAYER. */
     public static void Plr_InitSlave() {
-        throw new UnsupportedOperationException("controlloop.s::Plr_InitSlave (lien série 2J : RECFIRST/serial_nightmare.s)");
+        ensureSlaveLink();                                  // établit le lien TCP (connexion) si pas déjà connecté
+        int d0 = SerialNightmare.RECFIRST(0);               // jsr RECFIRST → d0 = n° de niveau du master
+        Mem.ww(Game_LevelNumber_w, d0);                     // move.w d0,Game_LevelNumber_w
+        int ch = (d0 + 'a') & 0xFF;                         // add.b #'a',d0
+        Mem.wb(Lvl_BinFilenameX_vb, ch);                    // move.b d0,Lvl_BinFilenameX_vb
+        Mem.wb(Lvl_GfxFilenameX_vb, ch);
+        Mem.wb(Lvl_ClipsFilenameX_vb, ch);
+        Mem.wb(Lvl_MapFilenameX_vb, ch);
+        Mem.wb(Lvl_FlyMapFilenameX_vb, ch);
+        d0 = SerialNightmare.RECFIRST(0);                   // jsr RECFIRST → d0 = graine Rand1 du master
+        Mem.ww(ObjectmoveData.Rand1, d0);                   // move.w d0,Rand1
+        coopMode = SerialNightmare.RECFIRST(0) != 0;        // reçoit le mode du master (ajout : synchro déterministe)
+        Mem.wb(AI_NoEnemies_b, coopMode ? 0xFF : 0);        // même effet que le master (aliens+portes en CO-OP)
+        TWOPLAYER();                                        // bsr TWOPLAYER
     }
 
     // ------------------------------------------------------------------
@@ -257,7 +322,14 @@ public final class Controlloop {
             ab3d2.c.SystemC.Sys_ClearKeyboard();            // CALLC Sys_ClearKeyboard
             ab3d2.host.Input.clearKeyQueue();
 
-            game_ReadMainMenu();                            // bsr game_ReadMainMenu (solo)
+            // game_BackToMenu : retour au menu du mode courant (solo / master / slave)
+            if (Mem.b(Plr_MultiplayerType_b) == PLR_SLAVE) {        // beq game_BackToSlave
+                game_SlaveMenu();
+            } else if (Mem.b(Plr_MultiplayerType_b) == PLR_MASTER) { // beq game_BackToMaster
+                game_MasterMenu();
+            } else {
+                game_ReadMainMenu();                        // bsr game_ReadMainMenu (solo)
+            }
 
             // game_DoneMenu :
             if (Mem.b(Game_ShouldQuit_b) != 0) {            // tst Game_ShouldQuit_b ; bne Game_Quit
@@ -328,6 +400,10 @@ public final class Controlloop {
                 playgame();
                 return;
             }
+            if (d0 == 1) {                                  // 2 JOUEURS (→ menu master)
+                game_MasterMenu();                          // bra game_MasterMenu (tail)
+                return;
+            }
             if (d0 == 2) {                                  // sélection de niveau
                 levelMenu();
                 refreshLevelName();
@@ -365,10 +441,107 @@ public final class Controlloop {
                 Mem.wb(Game_ShouldQuit_b, 0xFF);            // st Game_ShouldQuit_b
                 return;                                     // → Game_Quit (flux appelant)
             }
-            // items secondaires restants (1 = 2 joueurs/série, 4 = crédits, 5/6 = load/save)
-            // : handlers différés → simple redraw.
+            // item 4 = GAME CREDITS (`;jsr mnu_viewcredz` commenté dans l'original → no-op) : redraw.
             game_OpenMenu(mnu_MYMAINMENU);
         }
+    }
+
+    /**
+     * game_MasterMenu (controlloop.s:647) — menu 2 joueurs côté MASTER. Fixe PLR_MASTER, laisse
+     * le master choisir le niveau (item 1 = niveau suivant, borné à Game_LevelCounter_w), et sur
+     * PLAY (item 2) fixe Game_LevelNumber_w et rend la main → Game_Begin (handshake). Item 0 (titre)
+     * bascule vers le menu slave ; item 3 = config touches. Le lien TCP est établi au handshake.
+     */
+    public static void game_MasterMenu() {
+        Mem.wb(Plr_MultiplayerType_b, PLR_MASTER);          // move.b #PLR_MASTER,Plr_MultiplayerType_b
+        Mem.ww(game_LevelSelected_w, 0);                    // move.w #0,game_LevelSelected_w
+        setMasterLevelName(0);                              // nom du niveau 0 → mnu_CURRENTLEVELLINEM
+        setMasterModeLine();                                // affiche VERSUS / CO-OP (ligne mode)
+        game_OpenMenu(mnu_MYMASTERMENU);                    // bsr game_OpenMenu
+        while (true) {                                      // .rdlop
+            int d0 = game_CheckMenu(mnu_MYMASTERMENU);      // bsr game_CheckMenu
+            if (Mem.b(Game_ShouldQuit_b) != 0) {            // fenêtre fermée → sortie propre
+                return;
+            }
+            if (d0 == 1) {                                  // niveau suivant (borné, wrap à 0)
+                int lvl = Mem.w(game_LevelSelected_w) + 1;  // add.w #1,d0
+                if (lvl >= (short) Mem.w(Game_LevelCounter_w)) lvl = 0; // cmp Game_LevelCounter_w ; blt ; #0
+                Mem.ww(game_LevelSelected_w, lvl);
+                setMasterLevelName(lvl);
+                MenuNb.mnu_redraw(mnu_MYMASTERMENU);        // jsr mnu_redraw
+                continue;                                   // bra .rdlop
+            }
+            if (d0 == 2) {                                  // MODE : bascule VERSUS ↔ CO-OP (ajout 2J)
+                coopMode = !coopMode;
+                setMasterModeLine();
+                MenuNb.mnu_redraw(mnu_MYMASTERMENU);
+                continue;
+            }
+            if (d0 == 3) {                                  // PLAY GAME
+                Mem.ww(Game_LevelNumber_w, Mem.w(game_LevelSelected_w)); // move.w game_LevelSelected_w,Game_LevelNumber_w
+                return;                                     // rts → game_DoneMenu → Game_Begin
+            }
+            if (d0 == 0) {                                  // titre → bascule menu SLAVE
+                game_SlaveMenu();                           // bra game_SlaveMenu (tail)
+                return;
+            }
+            if (d0 == 4) {                                  // CONTROL OPTIONS
+                CHANGECONTROLS();
+                game_OpenMenu(mnu_MYMASTERMENU);
+                continue;                                   // bra .rdlop
+            }
+            // d0<0 (aucune sélection) : reboucle
+        }
+    }
+
+    /** Affiche le mode 2 joueurs courant (VERSUS / CO-OP) sur la ligne mode du menu master. */
+    private static void setMasterModeLine() {
+        writeMenuLine(mnu_MASTERMODELINE, coopMode ? "     COOP  MODE" : "    VERSUS  MODE");
+    }
+
+    /** Écrit une chaîne dans une ligne de menu (20 octets, complétée par des espaces). */
+    private static void writeMenuLine(int addr, String s) {
+        for (int i = 0; i < 20; i++) {
+            Mem.wb(addr + i, i < s.length() ? s.charAt(i) : ' ');
+        }
+    }
+
+    /**
+     * game_SlaveMenu (controlloop.s:718) — menu 2 joueurs côté SLAVE. Fixe PLR_SLAVE ; sur PLAY
+     * (item 1) rend la main → Game_Begin (le niveau vient du master par le handshake). Item 0
+     * (titre) revient au menu principal ; item 2 = config touches.
+     */
+    public static void game_SlaveMenu() {
+        Mem.wb(Plr_MultiplayerType_b, PLR_SLAVE);           // move.b #PLR_SLAVE,Plr_MultiplayerType_b
+        game_OpenMenu(mnu_MYSLAVEMENU);                     // bsr game_OpenMenu
+        while (true) {                                      // .rdlop
+            int d0 = game_CheckMenu(mnu_MYSLAVEMENU);       // bsr game_CheckMenu
+            if (Mem.b(Game_ShouldQuit_b) != 0) {
+                return;
+            }
+            if ((short) d0 < 0) {                           // tst.w d0 ; blt .rdlop
+                continue;
+            }
+            game_WaitForMenuKey();                          // bsr game_WaitForMenuKey
+            if (d0 == 1) {                                  // PLAY GAME
+                return;                                     // rts → game_DoneMenu → Game_Begin
+            }
+            if (d0 == 0) {                                  // titre → retour menu principal
+                game_ReadMainMenu();                        // bra game_ReadMainMenu (tail)
+                return;
+            }
+            if (d0 == 2) {                                  // CONTROL OPTIONS
+                CHANGECONTROLS();
+                game_OpenMenu(mnu_MYSLAVEMENU);
+                continue;                                   // bra .rdlop
+            }
+        }
+    }
+
+    /** Nom du niveau {@code lvl} (depuis le GLF) → ligne mnu_CURRENTLEVELLINEM du menu master. */
+    private static void setMasterLevelName(int lvl) {
+        int a0 = Mem.l(GLF_DatabasePtr_l) + GLFT_LevelNames_l + lvl * 40; // GLF + LevelNames + d0*40
+        game_SetMenuLevelName(a0, mnu_CURRENTLEVELLINEM);
     }
 
     /** Remplit mnu_CURRENTLEVELLINE avec le nom du niveau courant (depuis le GLF). */
@@ -398,16 +571,6 @@ public final class Controlloop {
             return;
         }
         Mem.ww(Game_LevelCounter_w, d0 + 8);               // niveaux I..P = 8..15
-    }
-
-    /** game_MasterMenu : menu hôte 2 joueurs. */
-    public static void game_MasterMenu() {
-        throw new UnsupportedOperationException("controlloop.s::game_MasterMenu (menunb.s + série)");
-    }
-
-    /** game_SlaveMenu : menu invité 2 joueurs. */
-    public static void game_SlaveMenu() {
-        throw new UnsupportedOperationException("controlloop.s::game_SlaveMenu (menunb.s + série)");
     }
 
     /** not.b : inverse un octet (toggle d'un booléen 0/0xFF). */
