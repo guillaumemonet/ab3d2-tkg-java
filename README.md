@@ -60,33 +60,70 @@ au premier build.
 
 ### Données du jeu
 
-Le moteur lit les **assets dépackés** depuis `medias/original/` (résolution des assigns Amiga
-`ab3:` / `-I media`). Ce dossier doit contenir les données du jeu (palette `256pal`, `levels/`,
-`includes/`, etc.). Il est résolu **par rapport au répertoire racine du projet** (parent de
-`java/`), c'est pourquoi toutes les tâches Gradle s'exécutent depuis cette racine.
+**Aucun asset du jeu n'est versionné ici.** Les données d'origine sont celles des disquettes
+(les cinq ADF), et le dépôt ne contient que du code.
+
+Le moteur lit les assets **dépackés** (résolution des assigns Amiga `ab3:` / `-I media`) :
+palette `256pal`, `levels/`, `includes/`, samples… `Assets.root` les cherche en **remontant**
+depuis le répertoire courant jusqu'à trouver un dossier `medias/original/` ; `-Dab3d2.assets`
+force le chemin.
+
+Les fichiers des disquettes sont compressés avec un format maison de Team 17, en-tête `=SB=` :
+
+| offset | taille | contenu |
+|---|---|---|
+| 0 | 4 | magic `=SB=` (`$3D53423D`) |
+| 4 | 4 | taille dépackée |
+| 8 | 4 | taille packée |
+| 12 | … | flux compressé |
+
+Le jeu le décode avec `unLHA` (`modules/file_io.s`), qui n'est qu'un `incbin "decomp4.raw"` —
+2508 octets de 68k, le même blob que celui embarqué dans l'outil `SBDepack` de 1997. Malgré son
+nom ce **n'est pas du LHA standard** : les chaînes de `SBDepack` annoncent « Decrunch algorithm
+by Team 17 ». Son portage est en cours ; en attendant, le moteur lit un dossier `medias/original`
+déjà dépacké.
 
 ---
 
 ## 3. Structure du projet
 
 ```
-ab3d2-tkg-new/
-├── README.md            ← ce fichier
-├── medias/original/     ← assets dépackés du jeu (palette, niveaux, includes, samples…)
-├── ab3d2_source/        ← sources ASM/C de référence (lecture seule)
-├── docs/                ← documentation d'architecture et notes de portage (PORT_SUBSYS_*)
-├── run/                 ← données générées à l'exécution (prefs.cfg, sauvegardes)
-└── java/
-    ├── build.gradle     ← build + tâches d'exécution/test
-    └── src/ab3d2/
-        ├── *.java        ← cœur du moteur (Hires, Controlloop, Plr*control, Objdraw…)
-        ├── c/            ← portage des fichiers C (ScreenC, DrawC, MenuC, GameC…)
-        ├── modules/      ← sous-systèmes (Player, Res, FileIo, RawKeyMacros…)
-        ├── data/         ← sections de données initialisées (tables, polices, menus)
-        ├── bss/          ← sections BSS (buffers, KeyMap…)
-        ├── menu/         ← moteur de menu (Menunb)
-        ├── host/         ← couche hôte LWJGL : Main, Display, Input, CustomChips + harnais de test
-        └── tools/        ← outillage (CheckLayout : garde-fou de disposition mémoire)
+ab3d2-tkg-new/                 espace de travail (non versionné)
+├── ab3d2-tkg/                 sources ASM/C d'origine — dépôt mheyer32/alienbreed3d2
+├── adf/                       les cinq disquettes : LA source des assets
+├── medias/original/           assets dépackés (temporaire, cf. « Données du jeu »)
+└── ab3d2-tkg-java/
+    ├── assets/                assets modernes produits par `extract` (regénérables)
+    └── java/                  ← CE DÉPÔT
+        ├── README.md
+        ├── build.gradle       build + tâches des deux moteurs
+        ├── docs/              architecture et notes de portage (PORT_SUBSYS_*)
+        ├── resources/Shaders/ shaders du moteur rebirth (seul asset sur le classpath)
+        ├── run/               données générées à l'exécution (prefs, sauvegardes)
+        └── src/ab3d2/
+            ├── *.java         cœur du moteur (Hires, Controlloop, Plr*control, Objdraw…)
+            ├── c/             portage des fichiers C (ScreenC, DrawC, MenuC, GameC…)
+            ├── modules/       sous-systèmes (Player, Res, FileIo, RawKeyMacros…)
+            ├── data/          sections de données initialisées (tables, polices, menus)
+            ├── bss/           sections BSS (buffers, KeyMap…)
+            ├── menu/          moteur de menu (Menunb)
+            ├── host/          MOTEUR 1 — le rendu d'origine, couche LWJGL
+            ├── rebirth/       MOTEUR 2 — remake full 3D sur jMonkeyEngine
+            │   ├── sim/       simulation partagée (collision, tir, IA) + harnais
+            │   ├── menu/      menu et options du remake
+            │   └── extract/   extraction des assets d'origine vers PNG/JSON/OBJ
+            └── tools/         outillage (CheckLayout : garde-fou de disposition mémoire)
+```
+
+Les **deux moteurs** partagent le même arbre source et le même build. Le portage fidèle
+(`host/`) reste l'**oracle** : c'est lui qui lit les formats d'origine et c'est contre lui que
+`rebirth/` est validé.
+
+```
+gradle -p java run                       # moteur 1 : le portage fidèle
+gradle -p java rebirth                   # moteur 2 : le remake jME
+gradle -p java extract                   # (re)fabrique les assets modernes
+gradle -p java moveTest shotTest alienTest   # validations headless du remake
 ```
 
 ---

@@ -11,6 +11,8 @@ ext {
     lwjglVersion = '3.3.4'
     // Natives Windows x64 (poste de dev). Ajouter d'autres classifiers si besoin.
     lwjglNatives = 'natives-windows'
+    // jMonkeyEngine : le MOTEUR du remake (paquet ab3d2.rebirth), stable validee JDK 21.
+    jmeVersion = '3.9.0-stable'
 }
 
 dependencies {
@@ -25,6 +27,17 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-openal::$lwjglNatives"
+
+    // --- moteur du remake (ab3d2.rebirth) ---
+    // jME 3 + backend LWJGL3 (apporte transitivement glfw/opengl/openal + natives).
+    implementation "org.jmonkeyengine:jme3-core:$jmeVersion"
+    implementation "org.jmonkeyengine:jme3-desktop:$jmeVersion"
+    implementation "org.jmonkeyengine:jme3-lwjgl3:$jmeVersion"
+    // Effets du moteur : BloomFilter, SSAO, eau... (fournit aussi Common/MatDefs/Post).
+    implementation "org.jmonkeyengine:jme3-effects:$jmeVersion"
+
+    // JSON moderne : assets extraits (niveaux, base GLF) et reglages du remake.
+    implementation 'com.google.code.gson:gson:2.11.0'
 }
 
 // Le portage conserve la disposition src/ NetBeans existante (pas src/main/java).
@@ -33,10 +46,11 @@ sourceSets {
         java {
             srcDirs = ['src']
         }
-        // Les assets dépackés sont lus directement depuis medias/original via DosLib :
-        // pas de resources Gradle à empaqueter.
+        // Les assets dépackés sont lus directement depuis medias/original via DosLib.
+        // Seuls les SHADERS du remake passent par l'AssetManager de jME : eux doivent
+        // etre sur le classpath.
         resources {
-            srcDirs = []
+            srcDirs = ['resources']
         }
     }
 }
@@ -333,4 +347,98 @@ tasks.register('packageApp', Copy) {
         new File(appImageDir, 'run').mkdirs()   // dossier d'écriture (prefs, sauvegardes)
         println "App-image redistribuable : ${appImageDir.absolutePath}"
     }
+}
+
+// ===========================================================================
+//  REBIRTH — l'autre MOTEUR du portage (paquet ab3d2.rebirth)
+//
+//  Le portage fidele (ab3d2.*) reste l'ORACLE : c'est lui qui lit les formats
+//  d'origine et c'est contre lui qu'on valide. rebirth n'en est qu'un rendu
+//  different, full 3D sur jMonkeyEngine, exactement comme host/ est le rendu
+//  d'origine. Les deux vivent dans le meme arbre source et le meme build.
+//
+//    gradle -p java run                      # le portage fidele (moteur d'origine)
+//    gradle -p java rebirth                  # le remake jME
+//    gradle -p java extract                  # (re)fabrique les assets modernes
+//    gradle -p java moveTest shotTest alienTest
+// ===========================================================================
+
+// Les assets MODERNES (PNG/JSON/OBJ) produits par `extract`. Hors depot, comme les
+// originaux : ils se regenerent depuis les fichiers d'origine.
+def rebirthAssets = new File(projectDir.parentFile, 'assets')
+
+// Les options -P<nom> du remake deviennent -Drebirth.<nom>. Un drapeau nu (-Pfoo)
+// vaut '1' ; sinon on transmet la valeur telle quelle.
+def rebirthFlags = { JavaExec t, List<String> names ->
+    names.each { n ->
+        if (project.hasProperty(n)) {
+            def v = project.property(n).toString()
+            t.systemProperty("rebirth.$n", v.isEmpty() ? '1' : v)
+        }
+    }
+}
+
+tasks.register('extract', JavaExec) {
+    group = 'rebirth'
+    description = "Extrait les assets d'origine en formats modernes (PNG/JSON/OBJ)"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.rebirth.extract.Extract'
+    workingDir = assetRoot                 // pour qu'Assets.root resolve medias/original
+    systemProperty 'rebirth.assets', rebirthAssets.absolutePath
+    if (project.hasProperty('what')) {
+        args(project.property('what').toString())
+    }
+    rebirthFlags(it, ['sprPal'])
+}
+
+tasks.register('rebirth', JavaExec) {
+    group = 'rebirth'
+    description = 'Lance le remake full 3D (jMonkeyEngine)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.rebirth.Main'
+    workingDir = projectDir
+    systemProperty 'rebirth.assets', rebirthAssets.absolutePath
+    rebirthFlags(it, [
+        'level', 'shot', 'freecam', 'at', 'noAction', 'health', 'sfxLog', 'nosound',
+        'stats', 'weaponLog', 'shimmer', 'deformLog', 'dynLog', 'shotLog', 'fire',
+        'gun', 'demo', 'spawn', 'autoplay', 'weaponInScene', 'story', 'startmenu',
+        'map', 'mapAll', 'angle', 'pitch', 'lightLog', 'lightBatch', 'noshadow',
+        'ssao', 'retro', 'fullbright', 'vsign',
+    ])
+}
+
+// --- validations headless de la simulation (doivent afficher PASS) ---
+['moveTest': 'ab3d2.rebirth.sim.MoveTest',
+ 'shotTest': 'ab3d2.rebirth.sim.ShotTest',
+ 'alienTest': 'ab3d2.rebirth.sim.AlienTest'].each { name, cls ->
+    tasks.register(name, JavaExec) {
+        group = 'verification'
+        description = "Teste la simulation du remake sans fenetre ($name)"
+        classpath = sourceSets.main.runtimeClasspath
+        mainClass = cls
+        workingDir = projectDir
+        systemProperty 'rebirth.assets', rebirthAssets.absolutePath
+        rebirthFlags(it, ['level', 'spawn', 'aiTrace', 'alienLog'])
+    }
+}
+
+tasks.register('lightTest', JavaExec) {
+    group = 'verification'
+    description = "Affiche l'anneau d'eclairage d'un objet (-Pring=x,z,zone)"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.rebirth.LightTest'
+    workingDir = projectDir
+    systemProperty 'rebirth.assets', rebirthAssets.absolutePath
+    rebirthFlags(it, ['anim', 'spr', 'ring', 'level'])
+}
+
+// Le portage a deja un menuTest (son propre menu) : celui-ci est le menu du remake.
+tasks.register('rebirthMenuTest', JavaExec) {
+    group = 'verification'
+    description = "Affiche l'ecran du menu du remake (fond defilant, feu, texte)"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.rebirth.menu.MenuTest'
+    workingDir = projectDir
+    systemProperty 'rebirth.assets', rebirthAssets.absolutePath
+    rebirthFlags(it, ['shot', 'page'])
 }
