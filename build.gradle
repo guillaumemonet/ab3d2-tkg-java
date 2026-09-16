@@ -66,6 +66,9 @@ base {
     archivesName = 'ab3d2-tkg'
 }
 
+// Version du portage, reprise par l'archive redistribuable.
+version = '0.1.0'
+
 application {
     // Point d'entrée réel du moteur (main.c → MainC.run via ab3d2.host.Main).
     mainClass = 'ab3d2.host.Main'
@@ -321,7 +324,7 @@ tasks.register('jpackageImage', Exec) {
         '--type', 'app-image',
         '--name', appImageName,
         '--input', libDir.absolutePath,
-        '--main-jar', "${base.archivesName.get()}.jar",
+        '--main-jar', tasks.jar.archiveFileName.get(),
         '--main-class', application.mainClass.get(),
         '--dest', appImageDest.absolutePath,
         '--java-options', '-Xms256m',
@@ -517,5 +520,30 @@ tasks.register('fetchDisks', JavaExec) {
     }
     if (project.hasProperty('url')) {
         systemProperty 'ab3d2.adfUrl', project.property('url').toString()
+    }
+}
+
+// Archive du build redistribuable, prete pour une release.
+//   gradle -p java packageZip  ->  build/distributions/AlienBreed3D2-TKG-<version>.zip
+//
+// GARDE-FOU : refuse de zipper si la moindre donnee du jeu traine dans l'image. Lancer
+// l'executable la remplit (il telecharge les disquettes), et rien de Team17 ne doit partir
+// dans une archive publiee.
+tasks.register('packageZip', Zip) {
+    group = 'distribution'
+    description = "Zippe le build redistribuable (refuse s'il contient des donnees du jeu)"
+    dependsOn 'packageApp'
+    archiveFileName = "${appImageName}-${project.version}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from appImageDir
+    into appImageName
+    doFirst {
+        def disques = new File(appImageDir, 'adf').listFiles({ f -> f.name.toLowerCase().endsWith('.adf') } as FileFilter)
+        def cache = new File(appImageDir, 'medias')
+        if ((disques != null && disques.length > 0) || cache.isDirectory()) {
+            throw new GradleException(
+                "L'image contient des donnees du jeu (adf/ ou medias/). Elles ne doivent PAS " +
+                "etre publiees : relance `gradle -p java packageApp` pour repartir d'une image neuve.")
+        }
     }
 }
