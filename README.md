@@ -5,14 +5,14 @@ Portage **Java fidèle** du moteur d'*Alien Breed 3D II : The Killing Grounds* (
 exécutée en natif sur PC via LWJGL 3.
 
 > Porté par **Guillaume Monet**, avec l'assistance de Claude.
-> Même méthodologie que le portage de *Gloom* (`../../Gloom/gloom-java/`).
 
 | Moteur d'origine (`gradle run`) | Remake full 3D (`gradle rebirth`) |
 | --- | --- |
 | ![Le moteur d'origine](docs/img/classic-niveau.png) | ![Le remake jMonkeyEngine](docs/img/rebirth-niveau.png) |
 
 *La même salle du niveau A, rendue par les deux moteurs. À gauche le rasteriseur d'origine en
-320×256 ; à droite le même niveau, la même simulation, sur jMonkeyEngine.*
+320×256 ; à droite le même niveau, la même simulation, sur jMonkeyEngine — un chantier en cours,
+cf. §2.*
 
 ---
 
@@ -56,8 +56,8 @@ le réécrit **ligne à ligne** en Java, sans approximation :
 
 ## 2. Les deux moteurs
 
-Les deux vivent dans le **même arbre source** et le **même build**, comme `gloom/host` et
-`gloom/rebirth` dans le portage de *Gloom*. Ils partagent la simulation ; seul l'affichage change.
+Les deux vivent dans le **même arbre source** et le **même build**. Ils partagent la simulation ;
+seul l'affichage change.
 
 ```bash
 gradle -p java run        # moteur 1 — le portage fidèle (défaut)
@@ -70,6 +70,12 @@ La traduction littérale. C'est lui **l'oracle** : quand un comportement du rema
 c'est contre celui-ci qu'on tranche, en instrumentant les deux et en comparant les traces.
 
 ### Moteur 2 — `ab3d2.rebirth` : le remake jMonkeyEngine
+
+> ⚠️ **Rebirth est très loin d'être fini.** C'est un chantier en cours, pas une version jouable
+> de bout en bout : il reste des bugs de rendu, de géométrie et de gameplay, tout n'est pas
+> porté, et le résultat peut diverger du jeu d'origine sans prévenir. Le moteur 1 est la seule
+> version fidèle et complète — c'est lui le défaut. Rebirth est fourni pour ce qu'il est : une
+> exploration.
 
 Vraie 3D, éclairage par lampes, ombres portées, bloom, visée verticale réelle. Il ne rejoue pas
 le rasteriseur : il reconstruit la géométrie des niveaux et rejoue **la même logique de jeu**
@@ -326,9 +332,9 @@ le menu Options du remake.
 | Audio : ProTracker + effets façon Paula | ✅ |
 | Build redistribuable (app-image jpackage) | ✅ `gradle packageApp` |
 | Dépacking `=SB=` + lecture des disquettes | ✅ `gradle adfCheck` — 313/313 |
-| Rebirth : géométrie, textures, éclairage, ombres | ✅ `gradle rebirth` |
-| Rebirth : simulation partagée (collision, tir, IA) | ✅ `moveTest`/`shotTest`/`alienTest` |
-| Rebirth : menu, options, save/load, carte | ✅ |
+| Rebirth : géométrie, textures, éclairage, ombres | 🚧 en chantier |
+| Rebirth : simulation partagée (collision, tir, IA) | 🚧 `moveTest`/`shotTest`/`alienTest` passent, le jeu reste incomplet |
+| Rebirth : menu, options, save/load, carte | 🚧 en chantier |
 | Mode 2 joueurs (TCP local, remplace le lien série) | ⏳ |
 | Chargement des sauvegardes par niveau (`DEFGAME`) | ⏳ |
 | Portage Linux/macOS (natives LWJGL) | ⏳ |
