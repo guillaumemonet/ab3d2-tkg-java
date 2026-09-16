@@ -1,222 +1,265 @@
 # Alien Breed 3D II : The Killing Grounds — Portage Java
 
 Portage **Java fidèle** du moteur d'*Alien Breed 3D II : The Killing Grounds* (Team17, Amiga,
-1996), depuis l'assembleur 68k et le C d'origine. Le jeu tourne en natif sur PC (Windows) via
-LWJGL 3, **sans émulateur**.
+1996), depuis l'assembleur 68k et le C d'origine. Réécriture **ligne à ligne**, sans émulateur,
+exécutée en natif sur PC via LWJGL 3.
 
 > Porté par **Guillaume Monet**, avec l'assistance de Claude.
+> Même méthodologie que le portage de *Gloom* (`../../Gloom/gloom-java/`).
+
+| Moteur d'origine (`gradle run`) | Remake full 3D (`gradle rebirth`) |
+| --- | --- |
+| ![Le moteur d'origine](docs/img/classic-niveau.png) | ![Le remake jMonkeyEngine](docs/img/rebirth-niveau.png) |
+
+*La même salle du niveau A, rendue par les deux moteurs. À gauche le rasteriseur d'origine en
+320×256 ; à droite le même niveau, la même simulation, sur jMonkeyEngine.*
 
 ---
 
-## 1. Présentation
+## 1. Principe
 
 Le moteur d'origine est écrit en assembleur 68000/68020/68060 et en C, et cible le matériel
 Amiga (puces custom, blitter, copper, audio Paula, conversion chunky→planar « C2P »). Ce projet
-le réécrit **ligne à ligne** en Java, en respectant la logique d'origine sans approximation :
+le réécrit **ligne à ligne** en Java, sans approximation :
 
-- **Mémoire plate big-endian** — un unique tableau d'octets (`Mem.RAM`, 64 Mo) émule la RAM 68k.
-  Tous les accès passent par des helpers typés (`Mem.b/w/l`, `Mem.ub/uw`, `Mem.wb/ww/wl`…) qui
-  reproduisent l'ordre des octets et l'arithmétique du 68k.
+- **Mémoire plate big-endian** — un unique `byte[] Mem.RAM` (64 Mo) émule la RAM 68k. Tous les
+  accès passent par des helpers typés (`Mem.b/w/l`, `Mem.ub/uw`, `Mem.wb/ww/wl`…) qui
+  reproduisent l'ordre des octets et l'arithmétique du 68k. Registres `d0-d7`/`a0-a6` → `int`.
+- **Helpers 68k** — `M68k` (`swap`, `muls/mulu`, `divs/divu`, `asrw`, extensions de signe…)
+  reproduit les idiomes du CPU, y compris ses pièges : `divs.w` renvoie `(reste << 16) | quotient`,
+  et oublier le reste a déjà coûté un bug d'IA entier.
 - **Cible 68060 + RTG** — on ne porte que la branche du processeur le plus rapide et l'affichage
-  *chunky* (RTG / carte graphique). Les variantes CPU/résolution et la conversion **C2P (planar)
-  sont volontairement exclues** : le moteur rend directement dans un tampon chunky présenté par
-  l'hôte.
-- **Couche hôte** — l'afficheur, la boucle de jeu, l'entrée clavier/souris et l'audio sont
-  réimplémentés au-dessus de **GLFW / OpenGL / OpenAL** (LWJGL 3), en lieu et place des puces
-  custom Amiga.
+  *chunky*. Les variantes CPU/résolution et la **conversion C2P sont volontairement exclues** :
+  le moteur rend directement dans un tampon chunky présenté par l'hôte.
+- **Couche hôte LWJGL 3** (GLFW / OpenGL / OpenAL) — remplace les puces custom Amiga pour
+  l'affichage, la boucle de jeu, l'entrée clavier/souris et l'audio.
+- **Deux moteurs, une seule simulation** — voir §2.
 
 ### Fonctionnalités portées
 
 - Rendu 3D temps réel des niveaux (murs texturés, sols/plafonds, éclairage, gouraud).
 - Objets/sprites, aliens et leur IA, armes et tir, ramassages, portes/ascenseurs/interrupteurs.
-- HUD texturé, messages en jeu, carte.
+- HUD texturé, messages en jeu, carte automatique.
 - Audio : musique (ProTracker) + effets sonores (mixage logiciel façon Paula).
 - **Menu complet** : écran de feu animé, navigation, sous-menus options/contrôles, save/load,
   sliders/cyclers, persistance des préférences.
 - **Texte narratif d'intro** de chaque niveau (police proportionnelle, rendu fidèle).
-- Transition de téléport + musique en fin de niveau.
-- **Sélection d'arme** : cycle (`\`) **et sélection directe par les touches `1`…`9`,`0`**.
+- Transition de téléport + musique de fin de niveau.
 
 ### Limitations connues
 
-- **Mode 2 joueurs** non disponible (le lien série Amiga d'origine n'est pas porté ; un mode
-  réseau TCP local est prévu — voir *Feuille de route*).
-- Plateforme de développement : **Windows x64** (natives LWJGL `natives-windows`). D'autres
-  plateformes nécessitent d'ajouter le classifier de natives correspondant.
+- **Mode 2 joueurs** non disponible (le lien série Amiga n'est pas porté ; un mode TCP local est
+  prévu — voir §8).
+- Plateforme de développement : **Windows x64** (natives LWJGL `natives-windows`).
 
 ---
 
-## 2. Prérequis
+## 2. Les deux moteurs
+
+Les deux vivent dans le **même arbre source** et le **même build**, comme `gloom/host` et
+`gloom/rebirth` dans le portage de *Gloom*. Ils partagent la simulation ; seul l'affichage change.
+
+```bash
+gradle -p java run        # moteur 1 — le portage fidèle (défaut)
+gradle -p java rebirth    # moteur 2 — le remake full 3D
+```
+
+### Moteur 1 — `ab3d2.host` : le rasteriseur d'origine
+
+La traduction littérale. C'est lui **l'oracle** : quand un comportement du remake est douteux,
+c'est contre celui-ci qu'on tranche, en instrumentant les deux et en comparant les traces.
+
+### Moteur 2 — `ab3d2.rebirth` : le remake jMonkeyEngine
+
+Vraie 3D, éclairage par lampes, ombres portées, bloom, visée verticale réelle. Il ne rejoue pas
+le rasteriseur : il reconstruit la géométrie des niveaux et rejoue **la même logique de jeu**
+(collision, tir, IA, portes), portée dans `rebirth/sim`.
+
+![Le menu du remake](docs/img/rebirth-menu.png)
+
+*Le menu d'origine — fond qui défile, texte qui brûle — reporté à l'identique dans le remake.
+Le feu est un portage littéral des trois blits Amiga `D = A_décalé | (B & C)`, où `A` est un plan
+de la police : c'est le texte lui-même qui alimente les flammes.*
+
+Le remake sait aussi rendre des choses que l'original ne pouvait pas :
+
+![Le niveau C, deux étages dans un même secteur](docs/img/rebirth-etage.png)
+
+*Niveau C, zone 117. Le jeu empile deux planchers dans un même secteur : une zone porte **deux**
+flux de géométrie, l'un pour le bas, l'autre pour le haut. L'extraction ne lisait que le premier
+et tout l'étage supérieur manquait — ici la passerelle au-dessus de l'escalier.*
+
+---
+
+## 3. Les données : les disquettes, et rien d'autre
+
+**Aucun asset du jeu n'est versionné ici.** La seule source est le jeu de cinq images `.adf`,
+placées dans un dossier `adf/` à côté du dépôt. Au premier lancement, le jeu les monte, dépacke
+ce qui doit l'être et écrit un cache ; ensuite il lit ce cache.
+
+```
+ab3d2-tkg-new/
+├── ab3d2-tkg/        sources ASM/C d'origine (dépôt mheyer32/alienbreed3d2)
+├── adf/              les cinq disquettes — LA source des assets
+├── medias/original/  cache d'extraction (regénéré, jamais versionné)
+└── ab3d2-tkg-java/
+    ├── assets/       assets modernes produits par `extract` (regénérables)
+    └── java/         ← CE DÉPÔT
+```
+
+### Le format `=SB=`
+
+Les fichiers des disquettes sont compressés. `io_LoadFile` (`modules/file_io.s`) branche sur le
+magic `'=SB='` et appelle `unLHA`, qui n'est qu'un `incbin "decomp4.raw"` — 2508 octets de 68k,
+le même blob que celui embarqué dans l'outil `SBDepack` de 1997.
+
+| offset | taille | contenu |
+| --- | --- | --- |
+| 0 | 4 | magic `=SB=` (`$3D53423D`) |
+| 4 | 4 | taille **dépackée** |
+| 8 | 4 | taille **packée** |
+| 12 | … | flux compressé |
+
+Les chaînes de `SBDepack` annoncent « *Decrunch algorithm by Team 17* », ce qui m'a d'abord fait
+chercher un format maison. C'est faux : le désassemblage de `decomp4.raw` montre la séquence
+exacte de `huf.c`,
+
+```
+07d4: moveq #$13,d1 ; moveq #$5,d0 ; moveq #$3,d2 ; bsr $344   -> read_pt_len(NT=19, TBIT=5, 3)
+07de: bsr $4f0                                                 -> read_c_len()
+07e2: move.w np,d1 ; moveq #$4,d0 ; cmp.w #$10,d1 ; blt ; addq #1,d0
+07f2: bsr $344                                                 -> read_pt_len(np, pbit, -1)
+```
+
+soit du **LHA**. Le blob porte deux points d'entrée qui ne diffèrent que par `np` :
+
+```
+01a0: move.w #$1fe,NC ; move.w #$e ,np    ; np=14 -> dicbit 13 (-lh5-)
+01b0: move.w #$1fe,NC ; move.w #$10,np    ; np=16 -> dicbit 15 (-lh6-)
+```
+
+et le jeu appelle **le second**. C'est du `-lh6-`, fenêtre de 32 Ko — décodé en `-lh5-` le flux
+part en vrille dès le premier bloc, ce qui est exactement ce qui m'avait égaré.
+
+Porté dans `host/SbDepack.java`, avec `host/Adf.java` (lecture OFS/FFS) et `host/AdfAssets.java`
+(montage). **Validation** : 430 fichiers sur les disquettes, 313 packés, **313 décodés sans
+erreur**, zéro écart de contenu avec un corpus dépacké de référence.
+
+```bash
+gradle -p java adfCheck    # valide le dépacking (doit afficher PASS)
+gradle -p java depack      # force la reconstruction du cache
+```
+
+### Quelles disquettes
+
+On cible la version **4 Mo**, donc trois disquettes suffisent : **3** (boot 4 Mo), **2**
+(niveaux A–P) et **5** (sons). La 1 est le boot 2 Mo — ses variantes sont différentes et plus
+pauvres — et la 4 est l'éditeur. L'ordre de montage compte : AmigaDOS ignorant la casse,
+`/includes` et `/Includes` sont **le même** répertoire, et sans cette fusion la variante 4 Mo
+n'écrase pas la 2 Mo.
+
+### Les `incbin`
+
+Vingt et un des vingt-deux `incbin` du moteur ne sont sur **aucune** disquette et ne sont
+référencés nulle part dans `test.lnk` (la base GLF) : tables du rasteriseur (`bigsine`,
+`iterfile`, `guff`, `waterfile`, `shimmerfile`), polices et chiffres, bordure d'écran, écran de
+menu, et les deux modules ProTracker de fin. C'est normal — l'assembleur les incorporait **au
+binaire**, ils n'ont jamais été livrés en fichiers. Ils font donc partie du *programme*, pas des
+données du jeu, et sont versionnés ici sous `resources/incbin/` (300 Ko).
+
+Seul `256pal` vient des disquettes ; `includes/newtitlepal` n'existe nulle part et reste absent.
+
+---
+
+## 4. Prérequis
 
 | Composant | Version |
 | --- | --- |
 | **JDK** | 21 (toolchain Gradle configurée sur Java 21) |
-| **Gradle** | 9.x (ou utiliser le wrapper si présent) |
+| **Gradle** | 9.x |
 | **OS** | Windows x64 (natives LWJGL `natives-windows`) |
-| **GPU** | OpenGL (pilote standard) |
+| **GPU** | OpenGL |
+| **Données** | les cinq `.adf` du jeu, dans un dossier `adf/` |
 
-Les dépendances LWJGL (GLFW, OpenGL, OpenAL) sont récupérées automatiquement depuis Maven Central
-au premier build.
-
-### Données du jeu
-
-**Aucun asset du jeu n'est versionné ici.** Les données d'origine sont celles des disquettes
-(les cinq ADF), et le dépôt ne contient que du code.
-
-Le moteur lit les assets **dépackés** (résolution des assigns Amiga `ab3:` / `-I media`) :
-palette `256pal`, `levels/`, `includes/`, samples… `Assets.root` les cherche en **remontant**
-depuis le répertoire courant jusqu'à trouver un dossier `medias/original/` ; `-Dab3d2.assets`
-force le chemin.
-
-Les fichiers des disquettes sont compressés avec un format maison de Team 17, en-tête `=SB=` :
-
-| offset | taille | contenu |
-|---|---|---|
-| 0 | 4 | magic `=SB=` (`$3D53423D`) |
-| 4 | 4 | taille dépackée |
-| 8 | 4 | taille packée |
-| 12 | … | flux compressé |
-
-Le jeu le décode avec `unLHA` (`modules/file_io.s`), qui n'est qu'un `incbin "decomp4.raw"` —
-2508 octets de 68k, le même blob que celui embarqué dans l'outil `SBDepack` de 1997. Le
-désassemblage tranche : c'est **LHA `-lh6-`** (fenêtre de 32 Ko). Le blob porte deux points
-d'entrée qui ne diffèrent que par `np`, et le jeu appelle celui qui vaut 16, pas 14 — décodé en
-`-lh5-` le flux part en vrille dès le premier bloc.
-
-Porté dans `host/SbDepack.java`, avec le lecteur de disquettes `host/Adf.java` (OFS/FFS) et le
-montage `host/AdfAssets.java`. Au premier lancement le jeu monte les disquettes **3** (boot 4 Mo),
-**2** (niveaux) et **5** (sons) — la 1 est le boot 2 Mo, la 4 l'éditeur — dépacke tout et écrit
-un cache ; ensuite il lit ce cache.
-
-```
-gradle -p java adfCheck    # valide le dépacking (430 fichiers, 313 packés, 0 écart)
-gradle -p java depack      # force la (re)fabrication du cache
-```
-
-#### Les `incbin`
-
-Vingt et un des vingt-deux `incbin` du moteur ne sont sur **aucune** disquette et ne sont
-référencés nulle part dans `test.lnk` (la base GLF) : tables du rasterizer (`bigsine`,
-`iterfile`, `guff`, `waterfile`, `shimmerfile`), polices et chiffres, bordure d'écran, écran de
-menu, et les deux modules ProTracker de fin. C'est normal — l'assembleur les incorporait au
-binaire, ils n'ont jamais été livrés en fichiers. Ils font donc partie du **programme**, pas des
-données du jeu, et sont versionnés ici sous `resources/incbin/` (300 Ko). Seul `256pal` est sur
-les disquettes ; `includes/newtitlepal` n'existe nulle part et reste absent.
+Les dépendances (LWJGL, jMonkeyEngine, gson) sont récupérées depuis Maven Central au premier build.
 
 ---
 
-## 3. Structure du projet
+## 5. Structure du projet
 
 ```
-ab3d2-tkg-new/                 espace de travail (non versionné)
-├── ab3d2-tkg/                 sources ASM/C d'origine — dépôt mheyer32/alienbreed3d2
-├── adf/                       les cinq disquettes : LA source des assets
-├── medias/original/           assets dépackés (temporaire, cf. « Données du jeu »)
-└── ab3d2-tkg-java/
-    ├── assets/                assets modernes produits par `extract` (regénérables)
-    └── java/                  ← CE DÉPÔT
-        ├── README.md
-        ├── build.gradle       build + tâches des deux moteurs
-        ├── docs/              architecture et notes de portage (PORT_SUBSYS_*)
-        ├── resources/Shaders/ shaders du moteur rebirth (seul asset sur le classpath)
-        ├── run/               données générées à l'exécution (prefs, sauvegardes)
-        └── src/ab3d2/
-            ├── *.java         cœur du moteur (Hires, Controlloop, Plr*control, Objdraw…)
-            ├── c/             portage des fichiers C (ScreenC, DrawC, MenuC, GameC…)
-            ├── modules/       sous-systèmes (Player, Res, FileIo, RawKeyMacros…)
-            ├── data/          sections de données initialisées (tables, polices, menus)
-            ├── bss/           sections BSS (buffers, KeyMap…)
-            ├── menu/          moteur de menu (Menunb)
-            ├── host/          MOTEUR 1 — le rendu d'origine, couche LWJGL
-            ├── rebirth/       MOTEUR 2 — remake full 3D sur jMonkeyEngine
-            │   ├── sim/       simulation partagée (collision, tir, IA) + harnais
-            │   ├── menu/      menu et options du remake
-            │   └── extract/   extraction des assets d'origine vers PNG/JSON/OBJ
-            └── tools/         outillage (CheckLayout : garde-fou de disposition mémoire)
-```
-
-Les **deux moteurs** partagent le même arbre source et le même build. Le portage fidèle
-(`host/`) reste l'**oracle** : c'est lui qui lit les formats d'origine et c'est contre lui que
-`rebirth/` est validé.
-
-```
-gradle -p java run                       # moteur 1 : le portage fidèle
-gradle -p java rebirth                   # moteur 2 : le remake jME
-gradle -p java extract                   # (re)fabrique les assets modernes
-gradle -p java moveTest shotTest alienTest   # validations headless du remake
+java/                       ← racine du dépôt
+├── README.md
+├── build.gradle            build + tâches des deux moteurs
+├── docs/                   architecture et notes de portage (PORT_SUBSYS_*, PVS.md)
+├── resources/
+│   ├── Shaders/            shaders du moteur rebirth
+│   └── incbin/             les incbin liés au binaire d'origine (cf. §3)
+├── run/                    généré à l'exécution (préférences, sauvegardes, journal)
+└── src/ab3d2/
+    ├── *.java              cœur du moteur (Hires, Controlloop, Plr*control, Objdraw…)
+    ├── c/                  portage des fichiers C (ScreenC, DrawC, MenuC, GameC…)
+    ├── modules/            sous-systèmes (Player, Res, FileIo, RawKeyMacros…)
+    ├── data/               sections de données initialisées (tables, polices, menus)
+    ├── bss/                sections BSS (buffers, KeyMap…)
+    ├── menu/               moteur de menu (Menunb)
+    ├── host/               MOTEUR 1 — rendu d'origine, couche LWJGL, lecture des disquettes
+    ├── rebirth/            MOTEUR 2 — remake jMonkeyEngine
+    │   ├── sim/            simulation partagée (collision, tir, IA) + harnais headless
+    │   ├── menu/           menu et options du remake
+    │   └── extract/        extraction des assets d'origine vers PNG/JSON/OBJ
+    └── tools/              outillage (CheckLayout, AdfCheck, Depack, SkyDump)
 ```
 
 ---
 
-## 4. Compilation & exécution
-
-Toutes les commandes se lancent **depuis le dossier `java/`** (ou avec `-p java` depuis la racine).
-
-### Lancer le jeu
+## 6. Compilation & exécution
 
 ```bash
-cd java
-gradle run
-```
-
-Le point d'entrée est `ab3d2.host.Main` (équivalent du `main.c` d'origine). Le jeu démarre sur le
-menu : choisis un niveau en solo, le texte d'intro s'affiche, puis le niveau se charge.
-
-### Compiler seulement
-
-```bash
+gradle -p java run                      # moteur 1 : le portage fidèle
+gradle -p java rebirth                  # moteur 2 : le remake jME
+gradle -p java rebirth -Plevel=c        # un autre niveau
+gradle -p java extract                  # (re)fabrique les assets modernes du remake
 gradle -p java compileJava
 ```
 
 ### Build redistribuable (Windows)
 
-Produit une **app-image portable** : un dossier autonome contenant l'exécutable, un **JRE
-embarqué** (rien à installer côté utilisateur) et les assets du jeu.
+Produit une **app-image portable** : un dossier autonome avec l'exécutable, un **JRE embarqué**
+et les assets.
 
 ```bash
 gradle -p java packageApp
 ```
 
-Résultat : `java/build/jpackage/AlienBreed3D2-TKG/` — lancer `AlienBreed3D2-TKG.exe`.
+Résultat : `java/build/jpackage/AlienBreed3D2-TKG/` — lancer `AlienBreed3D2-TKG.exe`. Le dossier
+est déplaçable : les chemins sont résolus relativement à l'exécutable.
 
-- Nécessite `jpackage` (inclus dans le JDK qui exécute Gradle).
-- Le dossier est **déplaçable** : `Main` résout les assets (`medias/original`) et le dossier
-  d'écriture (`run/`) **relativement à l'emplacement de l'exécutable**. On peut aussi forcer ces
-  chemins avec `-Dab3d2.dataDir=...` / `-Dab3d2.runDir=...`.
-- ⚠️ Les assets embarqués appartiennent à Team17 : ce paquet est réservé à un **usage personnel /
-  possesseurs du jeu**, pas à une diffusion publique.
-- Build **Windows x64** uniquement (natives LWJGL). Pour d'autres OS, ajouter le classifier de
-  natives correspondant dans `build.gradle`.
+> ⚠️ Les assets embarqués appartiennent à Team17 : ce paquet est réservé à un **usage personnel /
+> possesseurs du jeu**, pas à une diffusion publique.
 
 ### Diagnostic (gel / logs)
 
-L'app-image est **sans console** : `Main` redirige donc `stdout`/`stderr` vers
-`<App>/run/ab3d2.log`. En cas de **gel**, un *watchdog* surveille le rythme des frames et, si plus
-aucune frame ne passe pendant 5 s, écrit dans le log la **pile de tous les threads** (cherche
-`"main"` → c'est la boucle où le moteur est bloqué).
+L'app-image est sans console : `Main` redirige `stdout`/`stderr` vers `<App>/run/ab3d2.log`. En
+cas de gel, un *watchdog* écrit la pile de tous les threads après 5 s sans frame (chercher
+`"main"`).
 
-- `-Dab3d2.watchdogMs=N` : seuil de détection (ms ; `0` = désactive le watchdog).
-- `-Dab3d2.log=chemin` : fichier de log (`off` = garder la console).
-- Les `OutOfMemoryError` éventuels sont journalisés et déclenchent un *heap dump* (le build fixe
-  `-Xms256m -Xmx1g`). Un **gel n'est pas un OOM** : un manque de mémoire produit une erreur tracée,
-  pas un blocage silencieux.
-- Pour un debug **en direct**, lancer depuis un terminal `gradle -p java run` (la console est
-  conservée en mode dev).
+- `-Dab3d2.watchdogMs=N` — seuil (`0` désactive) ; `-Dab3d2.log=chemin` (`off` garde la console).
+- `-Dab3d2.assets=…` force la racine des assets, `-Dab3d2.adf=…` le dossier des disquettes.
 
 ### Vérifier l'intégrité du portage
 
-`checkLayout` valide la disposition mémoire (offsets des structures) — garde-fou de
-non-régression. Il **doit afficher « TOUT OK »**.
-
 ```bash
-gradle -p java checkLayout
+gradle -p java checkLayout    # disposition mémoire — doit afficher « TOUT OK »
+gradle -p java adfCheck       # dépacking des disquettes — doit afficher PASS
+gradle -p java moveTest shotTest alienTest [-Plevel=c]   # simulation, headless
 ```
 
 ---
 
-## 5. Contrôles
+## 7. Contrôles
 
-### Déplacement & combat (valeurs par défaut, remappables dans le menu Options › Contrôles)
+### Moteur 1 (remappables dans le menu Options › Contrôles)
 
 | Touche | Action |
 | --- | --- |
@@ -225,111 +268,92 @@ gradle -p java checkLayout
 | `A` / `D` | Pas de côté gauche / droite |
 | `Ctrl` | Tirer |
 | `F` | Actionner (portes, interrupteurs) |
-| `Shift` (gauche) | Courir |
-| `Alt` (gauche) | Forcer le pas de côté (strafe) |
-| `C` | S'accroupir |
-| `Espace` | Sauter |
-| `=` / `-` | Regarder en haut / en bas |
-| `;` | Recentrer la vue |
+| `Shift` gauche | Courir |
+| `Alt` gauche | Forcer le pas de côté |
+| `C` / `Espace` | S'accroupir / Sauter |
+| `=` / `-` / `;` | Regarder haut / bas / recentrer |
 | `L` | Regarder derrière |
+| `\` , `1`…`9`,`0` | Arme suivante, sélection directe |
+| `Échap` / `P` / `Tab` | Quitter le niveau / Pause / Carte |
+| `F7` / `F10` | Limite de FPS / Plein écran |
 
-### Armes
+> Le mapping clavier est **physique** (`W` de l'hôte → `RAWKEY_W`) ; les bindings de jeu sont
+> appliqués sur ces rawkeys par le moteur, exactement comme sur Amiga.
 
-| Touche | Action |
-| --- | --- |
-| `\` | Arme suivante (cycle parmi les armes possédées) |
-| `1` … `9`, `0` | **Sélection directe** d'une arme (si possédée) |
+### Moteur 2
 
-### Touches système
-
-| Touche | Action |
-| --- | --- |
-| `Échap` | Quitter le niveau |
-| `P` | Pause |
-| `Tab` | Carte |
-| `F7` | Cycle de la limite de FPS |
-| `F10` | Bascule plein écran / petit écran (HUD) |
-
-> Le mapping clavier est **physique** (la touche `W` de l'hôte → `RAWKEY_W`) ; les bindings de jeu
-> sont ensuite appliqués sur ces rawkeys par le moteur, exactement comme sur Amiga.
+`ZQSD`/`WASD` bouger, souris regarder, `Maj` courir, `Espace` sauter/jetpack, `C` s'accroupir,
+`E` actionner, clic tirer, `1`…`0`/`X` armes, `Tab` carte, `Échap` menu. Tout est remappable dans
+le menu Options du remake.
 
 ---
 
-## 6. Harnais de développement
+## 8. Avancement
 
-Plusieurs tâches Gradle court-circuitent le menu pour tester des sous-systèmes isolément.
-
-### Menu
-
-```bash
-# Menu interactif
-gradle -p java menuTest
-
-# Capture d'un écran de menu (N frames) → menu_screenshot.png
-gradle -p java menuTest -PmenuFrames=120 -PmenuShow=main      # main|custom|controls|level|load|save|demo
-
-# Capture du texte d'intro d'un niveau → intro_screenshot.png
-gradle -p java menuTest -PintroText=0
-
-# Test de persistance des préférences (sans fenêtre)
-gradle -p java menuTest -PprefsTest=1
-```
-
-### Niveau (rendu direct)
-
-```bash
-# Charge un niveau et le rend : -PlvlArgs="niveau frames angle"
-gradle -p java levelTest -PlvlArgs="0 300 0"
-```
-
-`levelTest` accepte de nombreux `-P` de diagnostic, par ex. : `-PshowMap`, `-Pfullbright`,
-`-Pfov=N`, `-PfullScreen=1`, `-PtestWeapons=1`, `-PtestPickup=1`, `-PtestSfx=1`, `-PtestMsg=1`,
-`-PtelefxFrame=N`, `-PwavOut=fichier.wav`, `-PdumpObjects=1`, `-PforceFrame=N`, `-PaltTex=1`…
-(voir `java/build.gradle` pour la liste complète).
-
-### Affichage
-
-```bash
-# Valide la chaîne d'affichage LWJGL : fenêtre + palette + buffer chunky de test
-gradle -p java displayTest
-```
+| Sous-système | Statut |
+| --- | --- |
+| Infra `Mem` / `M68k` / `Assets` | ✅ `gradle checkLayout` « TOUT OK » |
+| Rendu : murs, sols/plafonds, gouraud, PVS | ✅ `gradle levelTest` |
+| Objets, sprites, modèles vectoriels | ✅ |
+| Aliens : IA, animations, ligne de vue, dégâts | ✅ `gradle alienTest` |
+| Joueur : déplacement, collision, capacités | ✅ `gradle moveTest` |
+| Armes, tir, projectiles, impacts | ✅ `gradle shotTest` |
+| Portes, ascenseurs, interrupteurs | ✅ |
+| HUD, messages, carte automatique | ✅ |
+| Menu complet + préférences persistées | ✅ `gradle menuTest` |
+| Textes d'intro et de fin | ✅ |
+| Audio : ProTracker + effets façon Paula | ✅ |
+| Build redistribuable (app-image jpackage) | ✅ `gradle packageApp` |
+| Dépacking `=SB=` + lecture des disquettes | ✅ `gradle adfCheck` — 313/313 |
+| Rebirth : géométrie, textures, éclairage, ombres | ✅ `gradle rebirth` |
+| Rebirth : simulation partagée (collision, tir, IA) | ✅ `moveTest`/`shotTest`/`alienTest` |
+| Rebirth : menu, options, save/load, carte | ✅ |
+| Mode 2 joueurs (TCP local, remplace le lien série) | ⏳ |
+| Chargement des sauvegardes par niveau (`DEFGAME`) | ⏳ |
+| Portage Linux/macOS (natives LWJGL) | ⏳ |
 
 ---
 
-## 7. Notes d'architecture
+## 9. Notes d'architecture
 
-- **`Mem`** : mémoire 68k émulée (tableau plat big-endian) + helpers d'accès et d'initialisation
-  des sections data/bss (`dcB/dcW/dcL/dcStr/incbin/alloc/align`).
-- **`M68k` / `Macros`** : helpers reproduisant des opérations 68k (extensions de signe, etc.).
+- **`Mem`** : mémoire 68k émulée (tableau plat big-endian) + helpers d'initialisation des
+  sections data/bss (`dcB/dcW/dcL/dcStr/incbin/alloc/align`).
 - **Affichage** : le moteur rend dans `Vid_FastBufferPtr_l` (cible chunky). `ScreenC.Vid_Present`
-  compose le HUD et présente l'image ; `Vid_PresentMenu` gère le chemin planar→chunky du menu.
-  L'hôte (`host/Display`) pousse le tampon ARGB via OpenGL.
+  compose le HUD et présente l'image ; `host/Display` pousse le tampon ARGB via OpenGL.
 - **Entrée** : `host/Input` traduit les évènements GLFW en rawkeys Amiga écrits dans `KeyMap_vb`,
   que lisent les routines de contrôle (`Plr*control` → `modules/Player`).
-- **Audio** : mixage logiciel des canaux façon Paula, sortie via OpenAL.
-- **Fichiers** : `modules/FileIo` + `DosLib` réimplémentent les I/O AmigaDOS ; les écritures
+- **Audio** : mixage logiciel des canaux façon Paula, sortie OpenAL.
+- **Fichiers** : `modules/FileIo` + `host/DosLib` réimplémentent les I/O AmigaDOS ; les écritures
   (préférences, sauvegardes) vont dans `run/`.
 
-La documentation détaillée du portage par sous-système se trouve dans `docs/` (`ARCHITECTURE.md`,
+La documentation détaillée par sous-système est dans `docs/` (`ARCHITECTURE.md`,
 `PORT_SUBSYS_01..20.md`, `PVS.md`).
 
+### Méthode
+
+Une règle a gouverné tout le projet : **porter l'ASM littéralement, jamais approximer**. Quand un
+comportement diverge, on n'argumente pas — on **instrumente les deux moteurs et on compare les
+traces**. Quelques exemples de ce que cette méthode a débusqué :
+
+- Les aliens se regroupaient tous au même endroit : `divs.w` renvoie `(reste << 16) | quotient`
+  et le reste était jeté, donc chaque monstre tirait « au hasard » le point de contrôle 0.
+- Les monstres devenaient increvables : le jeu tient **deux** compteurs de dégâts distincts, le
+  cumul permanent (`AI_Damaged_vw`) et un champ du workspace de ronde que `ai_ProwlFly` remet à
+  zéro **à chaque frame**. Les confondre ne laissait mourir que ceux qui encaissaient quatre fois
+  leurs points de vie en une seule frame.
+- Les portes n'étaient pas des volumes : `DoorRoutine` écrit la position du battant dans le flat
+  de plafond de sa zone, et ce dessous-là ne bougeait pas.
+- Les escaliers superposés du niveau C manquaient : une zone porte **deux** flux de géométrie,
+  l'extracteur n'en lisait qu'un.
+
 ---
 
-## 8. Feuille de route
-
-- [ ] **Mode 2 joueurs** via socket TCP local/LAN (remplace le lien série Amiga ; protocole
-  lock-step longword).
-- [ ] Chargement des sauvegardes par niveau (`DEFGAME`).
-- [ ] Crédits du jeu (`mnu_viewcredz`, désactivé dans l'original).
-- [ ] Portage sur d'autres plateformes (ajout des natives LWJGL Linux/macOS).
-
----
-
-## 9. Licence & crédits
+## 10. Licence & crédits
 
 *Alien Breed 3D II : The Killing Grounds* et ses données sont la propriété de **Team17**. Ce
-projet est un portage **non commercial** à but d'étude/préservation. Les assets du jeu
-(`medias/`) ne sont pas redistribués avec le code source et restent soumis à leurs droits
-d'origine.
+projet est un portage **non commercial** à but d'étude et de préservation. Les assets du jeu ne
+sont **pas** redistribués avec ce dépôt : il faut posséder le jeu et fournir ses disquettes.
 
-Moteur d'origine : Team17 (Andy Clitheroe et al.). Portage Java : **Guillaume Monet**.
+Moteur d'origine : Team17 (Andy Clitheroe et al.). Sources ASM/C de référence :
+[mheyer32/alienbreed3d2](https://github.com/mheyer32/alienbreed3d2). Portage Java :
+**Guillaume Monet**.
