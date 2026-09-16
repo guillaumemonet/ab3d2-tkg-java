@@ -442,3 +442,44 @@ tasks.register('rebirthMenuTest', JavaExec) {
     systemProperty 'rebirth.assets', rebirthAssets.absolutePath
     rebirthFlags(it, ['shot', 'page'])
 }
+
+// ---------------------------------------------------------------------------
+//  DISQUETTES — la seule source des assets
+//    gradle -p java adfCheck     valide le depacking =SB= contre le corpus de reference
+//    gradle -p java depack       (re)fabrique le dossier d'assets depuis les .adf
+// ---------------------------------------------------------------------------
+def adfDir = new File(assetRoot, 'adf')
+
+tasks.register('adfCheck', JavaExec) {
+    group = 'verification'
+    description = 'Depacke toutes les disquettes et compare au corpus de reference (doit afficher PASS)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.tools.AdfCheck'
+    workingDir = assetRoot
+    systemProperty 'ab3d2.adf', (project.hasProperty('adf')
+            ? project.property('adf').toString() : adfDir.absolutePath)
+    systemProperty 'ab3d2.ref', (project.hasProperty('ref')
+            ? project.property('ref').toString()
+            : new File(assetRoot, 'medias/original').absolutePath)
+}
+
+tasks.register('depack', JavaExec) {
+    group = 'rebirth'
+    description = "Extrait les assets des disquettes (.adf) vers medias/original"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.tools.Depack'
+    workingDir = assetRoot
+    systemProperty 'ab3d2.adf', (project.hasProperty('adf')
+            ? project.property('adf').toString() : adfDir.absolutePath)
+    if (project.hasProperty('out')) {
+        systemProperty 'ab3d2.assets', project.property('out').toString()
+    }
+}
+
+// -Passets=<dossier> : force la racine des assets pour n'importe quelle tache (utile pour
+// verifier une extraction de disquettes sans toucher au cache courant).
+tasks.withType(JavaExec).configureEach {
+    if (project.hasProperty('assets')) {
+        systemProperty 'ab3d2.assets', project.property('assets').toString()
+    }
+}

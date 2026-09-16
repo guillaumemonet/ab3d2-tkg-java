@@ -3,7 +3,9 @@ package ab3d2;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,24 +24,51 @@ public final class Assets {
     public static Path root = findRoot();
 
     /**
-     * Cherche {@code medias/original} en REMONTANT depuis le repertoire courant. Le dossier des
-     * assets d'origine ne fait plus partie du depot : il vit a cote (racine de l'espace de
-     * travail), au meme niveau que {@code adf/}. La propriete {@code -Dab3d2.assets} prime.
+     * Où sont les assets d'origine. Ils ne font plus partie du dépôt : la seule source est le
+     * jeu de DISQUETTES ({@code adf/}), et le dossier lu ici n'est qu'un cache d'extraction.
+     *
+     * <p>Dans l'ordre : {@code -Dab3d2.assets} ; sinon un {@code medias/original} déjà présent
+     * en remontant depuis le répertoire courant ; sinon un dossier {@code adf/} dont on EXTRAIT
+     * les assets (dépacking {@code =SB=} compris) vers {@code medias/original}, une fois pour
+     * toutes. {@code -Dab3d2.adf} force le dossier des images.
      */
     private static Path findRoot() {
         String prop = System.getProperty("ab3d2.assets");
         if (prop != null && !prop.isBlank()) {
             return Path.of(prop);
         }
-        Path dir = Path.of("").toAbsolutePath();
-        for (int up = 0; up < 5 && dir != null; up++, dir = dir.getParent()) {
+        Path start = Path.of("").toAbsolutePath();
+        String adfProp = System.getProperty("ab3d2.adf");
+        Path adfDir = adfProp != null && !adfProp.isBlank() ? Path.of(adfProp) : null;
+        Path cache = null;
+        for (Path dir = start; dir != null; dir = dir.getParent()) {
             Path c = dir.resolve("medias").resolve("original");
             if (Files.isDirectory(c)) {
-                return c;
+                return c;                              // cache déjà là
+            }
+            if (cache == null && Files.isDirectory(dir.resolve("adf"))) {
+                adfDir = adfDir != null ? adfDir : dir.resolve("adf");
+                cache = c;                             // on extraira à côté des disquettes
             }
         }
-        return Path.of("medias", "original");          // defaut historique
+        if (adfDir != null && Files.isDirectory(adfDir)) {
+            Path dest = cache != null ? cache
+                    : adfDir.getParent().resolve("medias").resolve("original");
+            return ab3d2.host.AdfAssets.ensureExtractedUnchecked(adfDir, dest);
+        }
+        return Path.of("medias", "original");          // défaut historique
     }
+
+    /**
+     * Racines SUPPLÉMENTAIRES pour les {@code incbin}.
+     *
+     * <p>Quatorze fichiers que le moteur inclut à l'assemblage ne sont sur AUCUNE disquette :
+     * polices, {@code guff}, {@code bigsine}, {@code waterfile}, {@code shimmerfile}… C'est
+     * normal, ils sont liés DANS l'exécutable et n'ont donc jamais été livrés en fichiers. Le
+     * Makefile d'origine les résout avec {@code -I../media -I../media/includes} ; on fait
+     * pareil, en pointant le dépôt des sources ASM. {@code -Dab3d2.asm} force sa racine.
+     */
+    public static List<Path> incRoots = findIncRoots();
 
     /**
      * Mode tolérant : si un fichier incbin est introuvable, émet un avertissement
@@ -49,6 +78,36 @@ public final class Assets {
     public static boolean lenient = true;
 
     private Assets() {
+    }
+
+    /** {@code <depot ASM>/media} et {@code .../media/includes}, s'ils sont trouvables. */
+    private static List<Path> findIncRoots() {
+        List<Path> out = new ArrayList<>();
+        String prop = System.getProperty("ab3d2.asm");
+        Path media = null;
+        if (prop != null && !prop.isBlank()) {
+            media = Path.of(prop).resolve("media");
+        } else {
+            for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+                try (var s = Files.list(dir)) {
+                    var hit = s.filter(Files::isDirectory)
+                               .filter(d -> Files.isDirectory(d.resolve("media")
+                                       .resolve("includes")))
+                               .findFirst();
+                    if (hit.isPresent()) {
+                        media = hit.get().resolve("media");
+                        break;
+                    }
+                } catch (IOException ignore) {
+                    // répertoire illisible : on remonte
+                }
+            }
+        }
+        if (media != null && Files.isDirectory(media)) {
+            out.add(media);                            // -I../media
+            out.add(media.resolve("includes"));        // -I../media/includes
+        }
+        return out;
     }
 
     /**
@@ -107,6 +166,17 @@ public final class Assets {
         Path inIncludes = findCaseInsensitive(root, new String[]{"includes", base});
         if (inIncludes != null) {
             return inIncludes;
+        }
+        // Les incbin liés à l'assemblage ne sont sur aucune disquette : on les cherche dans
+        // le dépôt des sources, comme le faisait -I../media -I../media/includes.
+        for (Path r : incRoots) {
+            Path p = findCaseInsensitive(r, clean.split("/"));
+            if (p == null) {
+                p = findCaseInsensitive(r, new String[]{base});
+            }
+            if (p != null) {
+                return p;
+            }
         }
         // Les assets dépackés sont réorganisés en sous-dossiers (walls/, floors/, …) qui ne
         // correspondent pas aux assigns Amiga d'origine (WALLINC:, etc.). Dernier recours :
