@@ -1,11 +1,10 @@
-# --- Ce depot ne versionne QUE le portage java/ ---
-# rebirth/ (extraction des assets + remake jME) vit a cote, hors depot.
-/rebirth/
+# Ce depot EST le portage java/ : sa racine est ce dossier. rebirth/ (extraction
+# des assets + remake jME) vit a cote, hors depot.
 
 # --- Sorties de build Gradle ---
-/java/build/
-/java/.gradle/
-/java/bin/
+/build/
+/.gradle/
+/bin/
 
 # --- Assets ---
 # Aucun asset du jeu n'est versionne : les originaux sont lus dans les ADF
