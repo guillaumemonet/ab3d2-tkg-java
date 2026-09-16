@@ -78,10 +78,30 @@ Les fichiers des disquettes sont compressés avec un format maison de Team 17, e
 | 12 | … | flux compressé |
 
 Le jeu le décode avec `unLHA` (`modules/file_io.s`), qui n'est qu'un `incbin "decomp4.raw"` —
-2508 octets de 68k, le même blob que celui embarqué dans l'outil `SBDepack` de 1997. Malgré son
-nom ce **n'est pas du LHA standard** : les chaînes de `SBDepack` annoncent « Decrunch algorithm
-by Team 17 ». Son portage est en cours ; en attendant, le moteur lit un dossier `medias/original`
-déjà dépacké.
+2508 octets de 68k, le même blob que celui embarqué dans l'outil `SBDepack` de 1997. Le
+désassemblage tranche : c'est **LHA `-lh6-`** (fenêtre de 32 Ko). Le blob porte deux points
+d'entrée qui ne diffèrent que par `np`, et le jeu appelle celui qui vaut 16, pas 14 — décodé en
+`-lh5-` le flux part en vrille dès le premier bloc.
+
+Porté dans `host/SbDepack.java`, avec le lecteur de disquettes `host/Adf.java` (OFS/FFS) et le
+montage `host/AdfAssets.java`. Au premier lancement le jeu monte les disquettes **3** (boot 4 Mo),
+**2** (niveaux) et **5** (sons) — la 1 est le boot 2 Mo, la 4 l'éditeur — dépacke tout et écrit
+un cache ; ensuite il lit ce cache.
+
+```
+gradle -p java adfCheck    # valide le dépacking (430 fichiers, 313 packés, 0 écart)
+gradle -p java depack      # force la (re)fabrication du cache
+```
+
+#### Les `incbin`
+
+Vingt et un des vingt-deux `incbin` du moteur ne sont sur **aucune** disquette et ne sont
+référencés nulle part dans `test.lnk` (la base GLF) : tables du rasterizer (`bigsine`,
+`iterfile`, `guff`, `waterfile`, `shimmerfile`), polices et chiffres, bordure d'écran, écran de
+menu, et les deux modules ProTracker de fin. C'est normal — l'assembleur les incorporait au
+binaire, ils n'ont jamais été livrés en fichiers. Ils font donc partie du **programme**, pas des
+données du jeu, et sont versionnés ici sous `resources/incbin/` (300 Ko). Seul `256pal` est sur
+les disquettes ; `includes/newtitlepal` n'existe nulle part et reste absent.
 
 ---
 

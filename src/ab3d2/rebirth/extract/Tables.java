@@ -21,18 +21,19 @@ public final class Tables {
     public static void extract(Path out) throws IOException {
         Path dir = out.resolve("tables");
         Files.createDirectories(dir);
-        Path src = ab3d2.Assets.root.resolve("bigsine");
+        // bigsine et guff ne sont sur AUCUNE disquette : ce sont des incbin, embarques dans
+        // le depot. On passe donc par Assets, qui connait les deux sources.
+        byte[] sin = ab3d2.Assets.bytes("bigsine");
         Path dst = dir.resolve("sincos.bin");
-        Files.copy(src, dst, StandardCopyOption.REPLACE_EXISTING);
-        System.out.println("[tables] sincos.bin (" + Files.size(dst) + " o) ← " + src);
+        Files.write(dst, sin);
+        System.out.println("[tables] sincos.bin (" + sin.length + " o)");
 
         // guff : 16 positions verticales × 7 rangées × 16 directions — la grille de luminosité
         // appliquée aux sprites éclairés (drawBitmapLighted, Objdrawhires.java:1162).
-        Path guff = ab3d2.Assets.root.resolve("INCLUDES").resolve("guff");
-        if (Files.isRegularFile(guff)) {
-            Path gdst = dir.resolve("guff.bin");
-            Files.copy(guff, gdst, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("[tables] guff.bin (" + Files.size(gdst) + " o) ← " + guff);
+        byte[] guff = ab3d2.Assets.bytes("includes/guff");
+        if (guff != null) {
+            Files.write(dir.resolve("guff.bin"), guff);
+            System.out.println("[tables] guff.bin (" + guff.length + " o)");
         }
     }
 }

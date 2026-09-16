@@ -181,13 +181,12 @@ public final class Textures {
 
     /** Backdrop ciel (rawbackpacked, colonne-major, palette globale) → backdrop.png. */
     static void extractSky(Path dir, int[] pal) throws Exception {
-        Path file = ab3d2.Assets.root.resolve("INCLUDES").resolve("rawbackpacked");
-        if (!Files.exists(file)) {
+        byte[] data = ab3d2.Assets.bytes("includes/rawbackpacked");
+        if (data == null) {
             System.out.println("[textures] ciel : rawbackpacked absent");
             return;
         }
         Files.createDirectories(dir);
-        byte[] data = Files.readAllBytes(file);
         BufferedImage img = new BufferedImage(SKY_W, SKY_H, BufferedImage.TYPE_INT_RGB);
         for (int x = 0; x < SKY_W; x++) {
             for (int y = 0; y < SKY_H; y++) {

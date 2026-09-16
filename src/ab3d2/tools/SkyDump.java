@@ -42,8 +42,7 @@ public final class SkyDump {
             rgb[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
         }
 
-        Path file = ab3d2.Assets.root.resolve("INCLUDES").resolve("rawbackpacked");
-        byte[] data = Files.readAllBytes(file);
+        byte[] data = ab3d2.Assets.bytes("includes/rawbackpacked");
         System.out.println("rawbackpacked : " + data.length + " o (attendu " + (W * H) + ")");
 
         BufferedImage colImg = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);

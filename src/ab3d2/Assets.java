@@ -3,9 +3,7 @@ package ab3d2;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -60,17 +58,6 @@ public final class Assets {
     }
 
     /**
-     * Racines SUPPLÉMENTAIRES pour les {@code incbin}.
-     *
-     * <p>Quatorze fichiers que le moteur inclut à l'assemblage ne sont sur AUCUNE disquette :
-     * polices, {@code guff}, {@code bigsine}, {@code waterfile}, {@code shimmerfile}… C'est
-     * normal, ils sont liés DANS l'exécutable et n'ont donc jamais été livrés en fichiers. Le
-     * Makefile d'origine les résout avec {@code -I../media -I../media/includes} ; on fait
-     * pareil, en pointant le dépôt des sources ASM. {@code -Dab3d2.asm} force sa racine.
-     */
-    public static List<Path> incRoots = findIncRoots();
-
-    /**
      * Mode tolérant : si un fichier incbin est introuvable, émet un avertissement
      * et n'alloue rien (adresse valide mais bloc vide) au lieu de stopper.
      * Permet de démarrer le port avant que tous les assets soient en place.
@@ -80,42 +67,20 @@ public final class Assets {
     private Assets() {
     }
 
-    /** {@code <depot ASM>/media} et {@code .../media/includes}, s'ils sont trouvables. */
-    private static List<Path> findIncRoots() {
-        List<Path> out = new ArrayList<>();
-        String prop = System.getProperty("ab3d2.asm");
-        Path media = null;
-        if (prop != null && !prop.isBlank()) {
-            media = Path.of(prop).resolve("media");
-        } else {
-            for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
-                try (var s = Files.list(dir)) {
-                    var hit = s.filter(Files::isDirectory)
-                               .filter(d -> Files.isDirectory(d.resolve("media")
-                                       .resolve("includes")))
-                               .findFirst();
-                    if (hit.isPresent()) {
-                        media = hit.get().resolve("media");
-                        break;
-                    }
-                } catch (IOException ignore) {
-                    // répertoire illisible : on remonte
-                }
-            }
-        }
-        if (media != null && Files.isDirectory(media)) {
-            out.add(media);                            // -I../media
-            out.add(media.resolve("includes"));        // -I../media/includes
-        }
-        return out;
-    }
-
     /**
      * incbin "path" : charge le fichier dans Mem à l'adresse courante
      * d'allocation et renvoie cette adresse.
      */
     public static int incbin(String path) {
         Path p = resolve(path);
+        if (p == null) {
+            byte[] res = fromClasspath(path);
+            if (res != null) {
+                int a = Mem.alloc(res.length);
+                Mem.load(a, res);
+                return a;
+            }
+        }
         if (p == null) {
             String msg = "incbin introuvable: " + path + " (racine " + root + ")";
             if (!lenient) {
@@ -132,6 +97,42 @@ public final class Assets {
         } catch (IOException e) {
             throw new IllegalStateException("incbin: erreur de lecture " + p, e);
         }
+    }
+
+    /**
+     * Les {@code incbin} EMBARQUÉS dans le dépôt, sous {@code resources/incbin/}.
+     *
+     * <p>Vingt et un des vingt-deux {@code incbin} du moteur ne sont sur AUCUNE disquette et ne
+     * sont référencés nulle part dans {@code test.lnk} (la base GLF) : tables du rasterizer
+     * ({@code bigsine}, {@code iterfile}, {@code guff}, {@code waterfile}, {@code shimmerfile}),
+     * polices et chiffres, bordure d'écran, écran de menu, et les deux modules de fin. C'est
+     * normal : l'assembleur les incorporait au binaire, ils n'ont jamais été livrés en fichiers.
+     * Ils font donc partie du PROGRAMME, pas des données du jeu, et vivent dans le dépôt.
+     *
+     * <p>Seul {@code 256pal} est sur les disquettes ; {@code includes/newtitlepal} n'existe
+     * nulle part et reste absent (le mode indulgent l'accepte).
+     */
+    private static byte[] fromClasspath(String path) {
+        String clean = path.replace('\\', '/');
+        int colon = clean.indexOf(':');
+        if (colon >= 0) {
+            clean = clean.substring(colon + 1);
+        }
+        try (var in = Assets.class.getResourceAsStream("/incbin/" + clean)) {
+            return in == null ? null : in.readAllBytes();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Le contenu d'un fichier, par la MÊME résolution que {@link #incbin} : le dossier d'assets
+     * d'abord, puis les {@code incbin} embarqués dans le dépôt. Renvoie {@code null} si le
+     * fichier est introuvable — à l'appelant de décider si c'est fatal.
+     */
+    public static byte[] bytes(String path) throws IOException {
+        Path p = resolve(path);
+        return p != null ? Files.readAllBytes(p) : fromClasspath(path);
     }
 
     /** Charge un fichier (chemin style Amiga, ex. "ab3:levels/level_a/twolev.bin"). */
@@ -166,17 +167,6 @@ public final class Assets {
         Path inIncludes = findCaseInsensitive(root, new String[]{"includes", base});
         if (inIncludes != null) {
             return inIncludes;
-        }
-        // Les incbin liés à l'assemblage ne sont sur aucune disquette : on les cherche dans
-        // le dépôt des sources, comme le faisait -I../media -I../media/includes.
-        for (Path r : incRoots) {
-            Path p = findCaseInsensitive(r, clean.split("/"));
-            if (p == null) {
-                p = findCaseInsensitive(r, new String[]{base});
-            }
-            if (p != null) {
-                return p;
-            }
         }
         // Les assets dépackés sont réorganisés en sous-dossiers (walls/, floors/, …) qui ne
         // correspondent pas aux assigns Amiga d'origine (WALLINC:, etc.). Dernier recours :
