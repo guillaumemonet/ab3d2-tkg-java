@@ -329,23 +329,43 @@ tasks.register('jpackageImage', Exec) {
         '--java-options', '-XX:+HeapDumpOnOutOfMemoryError'
 }
 
-// Étape 2 : copie les assets + dossier d'écriture à côté de l'exe (résolus par Main).
-//   gradle -p java packageApp  →  build/jpackage/AlienBreed3D2-TKG/ (dossier portable).
-tasks.register('packageApp', Copy) {
+// Étape 2 : prépare le dossier portable. AUCUN asset du jeu n'est embarqué — l'exécutable
+// propose au premier lancement de télécharger les disquettes depuis Dream17, puis les dépacke
+// lui-même (cf. ab3d2.host.AdfDownload / AdfAssets).
+//   gradle -p java packageApp  →  build/jpackage/AlienBreed3D2-TKG/
+tasks.register('packageApp') {
     group = 'distribution'
-    description = 'Build redistribuable Windows complet (app-image jpackage + assets embarqués).'
+    description = "Build redistribuable Windows (app-image jpackage, sans donnees du jeu)."
     dependsOn 'jpackageImage'
-    def srcMedias = new File(assetRoot, 'medias/original')
-    doFirst {
-        if (!srcMedias.isDirectory()) {
-            throw new GradleException("Assets introuvables : ${srcMedias} (requis pour le build embarqué)")
-        }
-    }
-    from srcMedias
-    into new File(appImageDir, 'medias/original')
     doLast {
-        new File(appImageDir, 'run').mkdirs()   // dossier d'écriture (prefs, sauvegardes)
+        new File(appImageDir, 'adf').mkdirs()   // les disquettes atterriront la
+        new File(appImageDir, 'run').mkdirs()   // ce que le jeu ECRIT (prefs, sauvegardes)
+        def lisezmoi = [
+            'Alien Breed 3D II : The Killing Grounds - portage Java',
+            '======================================================',
+            '',
+            'Ce dossier ne contient AUCUNE donnee du jeu : uniquement le moteur porte.',
+            '',
+            'Au premier lancement, le jeu propose de telecharger les cinq disquettes (.adf)',
+            'depuis Dream17, le site de preservation du catalogue Amiga de Team17. Reponds',
+            "OUI et il s'occupe de tout : telechargement, decompression dans le dossier adf,",
+            'puis depacking des donnees.',
+            '',
+            'Si tu possedes deja les images, reponds NON et copie tes cinq fichiers .adf',
+            'dans le sous-dossier adf avant de relancer.',
+            '',
+            'Dossiers :',
+            '  adf     les disquettes du jeu',
+            '  medias  cache de donnees depackees (regenere automatiquement)',
+            '  run     tes reglages et tes sauvegardes',
+            '',
+            "Le jeu est (c) Team17. Ce portage est non commercial, a but d'etude et de",
+            'preservation.',
+        ]
+        new File(appImageDir, 'LISEZMOI.txt').setText(
+                lisezmoi.join(System.lineSeparator()), 'UTF-8')
         println "App-image redistribuable : ${appImageDir.absolutePath}"
+        println "  (sans donnees du jeu : elles se telechargent au premier lancement)"
     }
 }
 
@@ -481,5 +501,21 @@ tasks.register('depack', JavaExec) {
 tasks.withType(JavaExec).configureEach {
     if (project.hasProperty('assets')) {
         systemProperty 'ab3d2.assets', project.property('assets').toString()
+    }
+}
+
+// Recupere les disquettes depuis Dream17 (site de preservation Team17).
+//   gradle -p java fetchDisks [-Pdir=... ] [-Purl=...]
+tasks.register('fetchDisks', JavaExec) {
+    group = 'rebirth'
+    description = "Telecharge les images .adf du jeu depuis Dream17"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'ab3d2.host.AdfDownload'
+    workingDir = assetRoot
+    if (project.hasProperty('dir')) {
+        systemProperty 'ab3d2.adf', project.property('dir').toString()
+    }
+    if (project.hasProperty('url')) {
+        systemProperty 'ab3d2.adfUrl', project.property('url').toString()
     }
 }

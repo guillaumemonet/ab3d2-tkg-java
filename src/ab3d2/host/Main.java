@@ -51,7 +51,17 @@ public final class Main {
         if (dataOverride != null) {
             Assets.root = Path.of(dataOverride);
         } else if (base != null) {
-            Assets.root = base.resolve("medias").resolve("original");
+            // Build redistribuable : rien n'est embarque. Si le cache n'existe pas encore, on
+            // propose de telecharger les disquettes (cf. AdfDownload), puis on les depacke.
+            Path cache = base.resolve("medias").resolve("original");
+            if (!Files.isDirectory(cache)) {
+                Path adf = base.resolve("adf");
+                AdfDownload.ensureDisks(adf);
+                if (AdfDownload.hasDisks(adf)) {
+                    AdfAssets.ensureExtractedUnchecked(adf, cache);
+                }
+            }
+            Assets.root = cache;
         }
 
         String runOverride = System.getProperty("ab3d2.runDir");

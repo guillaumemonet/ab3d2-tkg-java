@@ -49,9 +49,17 @@ public final class Assets {
                 cache = c;                             // on extraira à côté des disquettes
             }
         }
-        if (adfDir != null && Files.isDirectory(adfDir)) {
+        if (adfDir == null) {
+            // Aucun dossier adf/ nulle part : on en vise un a cote du repertoire courant et on
+            // proposera de le remplir.
+            adfDir = start.resolve("adf");
+            cache = start.resolve("medias").resolve("original");
+        }
+        // Pas d'images ? On propose de les telecharger (rien sans accord explicite).
+        ab3d2.host.AdfDownload.ensureDisks(adfDir);
+        if (ab3d2.host.AdfDownload.hasDisks(adfDir)) {
             Path dest = cache != null ? cache
-                    : adfDir.getParent().resolve("medias").resolve("original");
+                    : adfDir.toAbsolutePath().getParent().resolve("medias").resolve("original");
             return ab3d2.host.AdfAssets.ensureExtractedUnchecked(adfDir, dest);
         }
         return Path.of("medias", "original");          // défaut historique

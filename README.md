@@ -93,9 +93,19 @@ et tout l'étage supérieur manquait — ici la passerelle au-dessus de l'escali
 
 ## 3. Les données : les disquettes, et rien d'autre
 
-**Aucun asset du jeu n'est versionné ici.** La seule source est le jeu de cinq images `.adf`,
-placées dans un dossier `adf/` à côté du dépôt. Au premier lancement, le jeu les monte, dépacke
-ce qui doit l'être et écrit un cache ; ensuite il lit ce cache.
+**Aucun asset du jeu n'est versionné ici**, et le build redistribuable n'en embarque aucun non
+plus. La seule source est le jeu de cinq images `.adf`, dans un dossier `adf/`.
+
+Si elles manquent, le jeu **propose de les télécharger** depuis [Dream17](https://dream17.abime.net),
+le site de préservation du catalogue Amiga de Team17 (archive ZIP d'environ 3,4 Mo). Rien n'est
+téléchargé sans un oui explicite. Puis il monte les disquettes, dépacke ce qui doit l'être et
+écrit un cache ; ensuite il lit ce cache.
+
+```bash
+gradle -p java fetchDisks    # récupérer les disquettes à la main
+```
+
+`-Dab3d2.adfUrl=…` change la source, `-Dab3d2.noDownload` désactive la proposition.
 
 ```
 ab3d2-tkg-new/
@@ -225,8 +235,8 @@ gradle -p java compileJava
 
 ### Build redistribuable (Windows)
 
-Produit une **app-image portable** : un dossier autonome avec l'exécutable, un **JRE embarqué**
-et les assets.
+Produit une **app-image portable** : un dossier autonome avec l'exécutable et un **JRE
+embarqué**, et *sans aucune donnée du jeu*.
 
 ```bash
 gradle -p java packageApp
@@ -235,8 +245,19 @@ gradle -p java packageApp
 Résultat : `java/build/jpackage/AlienBreed3D2-TKG/` — lancer `AlienBreed3D2-TKG.exe`. Le dossier
 est déplaçable : les chemins sont résolus relativement à l'exécutable.
 
-> ⚠️ Les assets embarqués appartiennent à Team17 : ce paquet est réservé à un **usage personnel /
-> possesseurs du jeu**, pas à une diffusion publique.
+```
+AlienBreed3D2-TKG/
+├── AlienBreed3D2-TKG.exe
+├── LISEZMOI.txt
+├── adf/        les disquettes (vide au départ)
+├── app/        les jars
+├── run/        réglages et sauvegardes
+└── runtime/    le JRE embarqué
+```
+
+Au **premier lancement**, le jeu constate que les données manquent et propose de télécharger les
+disquettes ; il les dépacke ensuite tout seul dans `medias/`. Comme rien de Team17 n'est
+redistribué, le paquet peut circuler tel quel.
 
 ### Diagnostic (gel / logs)
 
