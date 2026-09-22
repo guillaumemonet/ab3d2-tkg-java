@@ -1,5 +1,5 @@
-# Ce depot EST le portage java/ : sa racine est ce dossier. rebirth/ (extraction
-# des assets + remake jME) vit a cote, hors depot.
+# Ce depot EST le portage java/ : sa racine est ce dossier. Le remake rebirth/ est
+# un projet a part entiere, a cote (../rebirth), avec son propre build.
 
 # --- Sorties de build Gradle ---
 /build/
