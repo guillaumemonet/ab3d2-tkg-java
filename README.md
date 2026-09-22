@@ -1,5 +1,7 @@
 # Alien Breed 3D II: The Killing Grounds — Java Port
 
+![Alien Breed 3D II: The Killing Grounds](docs/img/the_killing_grounds_full_hd.jpg)
+
 A **faithful Java port** of the *Alien Breed 3D II: The Killing Grounds* engine (Team17, Amiga,
 1996), from the original 68k assembly and C. A **line-by-line** rewrite, no emulator, running
 natively on PC through LWJGL 3.
@@ -8,13 +10,9 @@ natively on PC through LWJGL 3.
 
 *[Version française](README_FR.md)*
 
-| Original engine (`gradle run`) | Full-3D remake (`gradle rebirth`) |
-| --- | --- |
-| ![The original engine](docs/img/classic-niveau.png) | ![The jMonkeyEngine remake](docs/img/rebirth-niveau.png) |
+![The original engine](docs/img/classic-niveau.png)
 
-*The same room in level A, drawn by both engines. On the left the original rasteriser at
-320×256; on the right the same level and the same simulation on jMonkeyEngine — a work in
-progress, see §2.*
+*Level A, drawn by the ported original engine — 320×256, just as on the Amiga.*
 
 ---
 
@@ -56,47 +54,20 @@ rewrites it **line by line** in Java, without approximation:
 
 ---
 
-## 2. The two engines
+## 2. The full-3D remake, elsewhere
 
-Both live in the **same source tree** and the **same build**. They share the simulation; only the
-display differs.
+This repository holds the **faithful port** only: the line-by-line translation of the original
+engine, which remains the one complete and exact version.
 
-```bash
-gradle -p java run        # engine 1 — the faithful port (default)
-gradle -p java rebirth    # engine 2 — the full-3D remake
-```
+The **full-3D** remake on jMonkeyEngine is a project of its own:
+**[ab3d2-tkg-rebirth](https://github.com/guillaumemonet/ab3d2-tkg-rebirth)**. It is not another port but another engine — it rebuilds the levels in
+true 3D and replays the same game logic. It leans on this repository in two ways:
 
-### Engine 1 — `ab3d2.host`: the original rasteriser
+- as the authoritative **reader** of the original formats, to extract the assets;
+- as the **oracle**: whenever the remake's behaviour looks wrong, it is settled against this port,
+  by instrumenting both and diffing the traces.
 
-The literal translation. This one is the **oracle**: whenever the remake's behaviour looks wrong,
-it is settled against this engine, by instrumenting both and diffing the traces.
-
-### Engine 2 — `ab3d2.rebirth`: the jMonkeyEngine remake
-
-> ⚠️ **Rebirth is nowhere near finished.** It is a work in progress, not a playable-end-to-end
-> build: rendering, geometry and gameplay bugs remain, not everything is ported, and it can
-> diverge from the original game without warning. Engine 1 is the only faithful and complete
-> version — and it is the default. Rebirth is offered for what it is: an exploration.
-
-True 3D, per-lamp lighting, cast shadows, bloom, real vertical aiming. It does not replay the
-rasteriser: it rebuilds the level geometry and replays **the same game logic** (collision,
-shooting, AI, doors), ported into `rebirth/sim`.
-
-![The remake's menu](docs/img/rebirth-menu.png)
-
-*The original menu — scrolling backdrop, burning text — carried over as-is into the remake. The
-fire is a literal port of the three Amiga blits `D = A_shifted | (B & C)`, where `A` is a plane of
-the font: the text itself is what feeds the flames.*
-
-The remake can also draw things the original could not:
-
-![Level C, two floors in one sector](docs/img/rebirth-etage.png)
-
-*Level C, zone 117. The game stacks two floors inside a single sector: a zone carries **two**
-geometry streams, one for the lower level and one for the upper. The extractor only read the
-first, so the whole upper storey was missing — here, the walkway above the stairs.*
-
----
+This repository does not depend on it: it builds and runs on its own.
 
 ## 3. The data: the floppies, and nothing else
 
@@ -199,7 +170,7 @@ Only `256pal` comes from the floppies; `includes/newtitlepal` exists nowhere and
 | **GPU** | OpenGL |
 | **Data** | the game's five `.adf` images, in an `adf/` folder |
 
-Dependencies (LWJGL, jMonkeyEngine, gson) are fetched from Maven Central on the first build.
+The LWJGL dependencies (GLFW, OpenGL, OpenAL) are fetched from Maven Central on the first build.
 
 ---
 
@@ -209,11 +180,9 @@ Dependencies (LWJGL, jMonkeyEngine, gson) are fetched from Maven Central on the 
 java/                       ← repository root
 ├── README.md             this file (English)
 ├── README_FR.md          version française
-├── build.gradle            build + tasks for both engines
+├── build.gradle
 ├── docs/                   architecture and porting notes (PORT_SUBSYS_*, PVS.md)
-├── resources/
-│   ├── Shaders/            shaders for the rebirth engine
-│   └── incbin/             the incbin files linked into the original binary (see §3)
+├── resources/incbin/       the incbin files linked into the original binary (see §3)
 ├── run/                    written at runtime (preferences, saves, log)
 └── src/ab3d2/
     ├── *.java              engine core (Hires, Controlloop, Plr*control, Objdraw…)
@@ -222,11 +191,7 @@ java/                       ← repository root
     ├── data/               initialised data sections (tables, fonts, menus)
     ├── bss/                BSS sections (buffers, KeyMap…)
     ├── menu/               menu engine (Menunb)
-    ├── host/               ENGINE 1 — original rendering, LWJGL layer, floppy reading
-    ├── rebirth/            ENGINE 2 — jMonkeyEngine remake
-    │   ├── sim/            shared simulation (collision, shooting, AI) + headless harnesses
-    │   ├── menu/           the remake's menu and options
-    │   └── extract/        extraction of the original assets to PNG/JSON/OBJ
+    ├── host/               LWJGL layer, floppy reading, =SB= unpacking
     └── tools/              tooling (CheckLayout, AdfCheck, Depack, SkyDump)
 ```
 
@@ -235,10 +200,7 @@ java/                       ← repository root
 ## 6. Building & running
 
 ```bash
-gradle -p java run                      # engine 1: the faithful port
-gradle -p java rebirth                  # engine 2: the jME remake
-gradle -p java rebirth -Plevel=c        # another level
-gradle -p java extract                  # (re)build the remake's modern assets
+gradle -p java run             # the game
 gradle -p java compileJava
 ```
 
@@ -281,14 +243,13 @@ freeze, a *watchdog* dumps every thread's stack after 5 s without a frame (look 
 ```bash
 gradle -p java checkLayout    # memory layout — must print "TOUT OK"
 gradle -p java adfCheck       # floppy unpacking — must print PASS
-gradle -p java moveTest shotTest alienTest [-Plevel=c]   # simulation, headless
 ```
 
 ---
 
 ## 7. Controls
 
-### Engine 1 (remappable in Options › Controls)
+Remappable in Options › Controls.
 
 | Key | Action |
 | --- | --- |
@@ -309,12 +270,6 @@ gradle -p java moveTest shotTest alienTest [-Plevel=c]   # simulation, headless
 > Key mapping is **physical** (the host's `W` → `RAWKEY_W`); the game's own bindings are then
 > applied to those rawkeys by the engine, exactly as on the Amiga.
 
-### Engine 2
-
-`WASD` to move, mouse to look, `Shift` to run, `Space` to jump/jetpack, `C` to crouch, `E` to
-operate, click to fire, `1`…`0`/`X` for weapons, `Tab` for the map, `Esc` for the menu. Everything
-is remappable in the remake's Options menu.
-
 ---
 
 ## 8. Status
@@ -334,12 +289,11 @@ is remappable in the remake's Options menu.
 | Audio: ProTracker + Paula-style effects | ✅ |
 | Redistributable build (jpackage app-image) | ✅ `gradle packageApp` |
 | `=SB=` unpacking + floppy reading | ✅ `gradle adfCheck` — 313/313 |
-| Rebirth: geometry, textures, lighting, shadows | 🚧 work in progress |
-| Rebirth: shared simulation (collision, firing, AI) | 🚧 `moveTest`/`shotTest`/`alienTest` pass, the game is still incomplete |
-| Rebirth: menu, options, save/load, map | 🚧 work in progress |
 | Two-player mode (local TCP, replacing the serial link) | ⏳ |
 | Per-level save loading (`DEFGAME`) | ⏳ |
 | Linux/macOS port (LWJGL natives) | ⏳ |
+
+The full-3D remake has its own status board in [ab3d2-tkg-rebirth](https://github.com/guillaumemonet/ab3d2-tkg-rebirth).
 
 ---
 
