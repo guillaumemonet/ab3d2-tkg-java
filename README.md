@@ -270,6 +270,16 @@ Remappable in Options › Controls.
 > Key mapping is **physical** (the host's `W` → `RAWKEY_W`); the game's own bindings are then
 > applied to those rawkeys by the engine, exactly as on the Amiga.
 
+**Not all doors behave alike**, and this catches people out. Each door carries an opening
+condition in the level data: some open **by themselves** when you walk up, others need `F`.
+Whole levels are of one kind -- D, H, L, O and P are entirely automatic, while A and C need
+`F` for *every* door. Come to C after playing O and nothing will open until you press it.
+
+Keycard doors are a separate matter: a door stays locked while its card is still lying in the
+level, and unlocks the moment you pick it up. On a few levels the card is carried by a monster
+instead, so the door only opens once you kill it -- D, H, L and P have no cards on the floor
+at all.
+
 ---
 
 ## 8. Status
