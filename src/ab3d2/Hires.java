@@ -2334,7 +2334,19 @@ public final class Hires {
                 // ESC est géré nativement : en solo Game_SlaveQuit_b est déjà =$FF (Game_Begin),
                 // donc ESC pose Game_MasterQuit_b → (Master && Slave) → endnomusic → sortie propre.
             }
-            VBlankInterrupt();                               // hôte : tick VBL par frame (entrée + MAJ jeu)
+            // Le balayage vertical bat a 50 Hz (PAL), PAS une fois par image dessinee : c'est
+            // lui qui avance Anim_Timer_w, donc les animations, l'IA et les degats de sol. Le
+            // jeu compense deja sa vitesse d'affichage en consommant le nombre de pas accumules
+            // (Anim_FramesToDraw_w) ; le lier a la frequence de l'ecran cassait cette
+            // compensation. Le harnais de test, lui, garde un top par frame pour rester
+            // deterministe.
+            if (headless || loopFrameLimit >= 0) {
+                VBlankInterrupt();
+            } else {
+                for (int t = ab3d2.host.Vbl.due(); t > 0; t--) {
+                    VBlankInterrupt();
+                }
+            }
             // move.w #%110000000000,_custom+potgo : lecture pot (boutons) — no-op host.
 
             // --- messages de mort 2 joueurs (master tue J2, slave tue J1) ---
@@ -2648,9 +2660,23 @@ public final class Hires {
     private static int SystemBss_Sys_FPSLimit_w() { return ab3d2.bss.SystemBss.Sys_FPSLimit_w; }
     private static int LevelBss_Lvl_ZoneBorderPointsPtr_l() { return ab3d2.bss.LevelBss.Lvl_ZoneBorderPointsPtr_l; }
 
-    /** WaitTOF (graphics.library) : attend le top-of-frame. Host : avance le compteur VBL. */
+    /**
+     * WaitTOF (graphics.library) : attend le top-of-frame.
+     *
+     * <p>C'est de cette attente que depend le limiteur de F7 : la boucle de game_main_loop
+     * tourne tant que Vid_VBLCount_l n'a pas depasse Vid_VBLCountLast_l + Sys_FPSLimit_w, et
+     * c'est le balayage qui avance ce compteur. Tant que WaitTOF n'attendait pas vraiment --
+     * il se contentait d'incrementer le compteur -- la boucle se vidait d'un trait et la touche
+     * ne faisait rien. On attend donc le vrai top, et l'interruption le fait avancer, comme sur
+     * la machine. Le harnais de test garde l'ancien comportement, qui le rend deterministe.
+     */
     private static void WaitTOF() {
-        Mem.wl(Vid_VBLCount_l, Mem.l(Vid_VBLCount_l) + 1);   // placeholder cadence (vsync réel via Vid_Present)
+        if (headless || loopFrameLimit >= 0) {
+            Mem.wl(Vid_VBLCount_l, Mem.l(Vid_VBLCount_l) + 1);
+            return;
+        }
+        ab3d2.host.Vbl.waitNext();
+        VBlankInterrupt();                                   // le balayage avance Vid_VBLCount_l
     }
 
     /** frames clamp + copie Plr1_Snap*→Tmp* (hires.s 1151-1170, chemin solo). */
