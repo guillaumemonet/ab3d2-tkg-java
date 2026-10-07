@@ -273,6 +273,13 @@ public final class LevelTest {
                 Hires.loopFrameLimit = ab3d2.Defs.NUM_GUN_DEFS * Hires.DBG_FRAMES_PER_GUN + 5; // ~155 frames
                 System.out.println("[LevelTest] test des " + ab3d2.Defs.NUM_GUN_DEFS + " armes (cycle + tir)");
             }
+            if ("1".equals(System.getProperty("noEnemies"))) {  // DIAG : conditions du SOLO
+                // Controlloop pose AI_NoEnemies_b = $FF en un joueur (controlloop.s:317) ; le
+                // harnais n'y passe pas, or c'est ce drapeau qui autorise les VERROUS par cle.
+                // Sans lui on teste des portes qui ne sont jamais verrouillees.
+                ab3d2.Mem.wb(ab3d2.bss.AiBss.AI_NoEnemies_b, 0xFF);
+                System.out.println("[LevelTest] AI_NoEnemies_b = $FF (verrous par cle actifs)");
+            }
             if ("1".equals(System.getProperty("testPickup"))) { // DIAG : trace la collecte d'objets
                 ab3d2.Newaliencontrol.dbgCollect = true;
                 System.out.println("[LevelTest] trace collecte (pickup) activée");
