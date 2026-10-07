@@ -1170,6 +1170,7 @@ public final class Newanims {
                         a0 += 2;                       // move.w (a0)+,d2  (32, valeur ignorée)
                         d2 = setw(0, Mem.uw(anim_CurrentLiftable_w)); // move.w anim_CurrentLiftable_w,d2
                         d5 = setw(0, Mem.uw(Anim_DoorAndLiftLocks_l)); // move.w Anim_DoorAndLiftLocks_l,d5
+                        dbgDoorLock(Mem.uw(anim_CurrentLiftable_w), d5);
                         if ((d5 & (1 << (d2 & 31))) != 0) { // btst d2,d5 (registre → mod 32 ; d5=word donc bits 16-31=0 → porte ≥16 toujours ouverte)
                             // (lock path) move.w (a0)+,d5
                             d5 = setw(0, Mem.uw(a0)); a0 += 2; // move.w (a0)+,d5  (34)
@@ -1205,6 +1206,7 @@ public final class Newanims {
                         d4 = setw(0, Mem.uw(a4 + 14));  // move.w 14(a4),d4
                         Mem.ww(a4 + 14, 0x8000);       // move.w #$8000,14(a4)
                         d4 = setw(d4, d4 & d1);        // and.w d1,d4
+                        dbgDoorTrigger(Mem.uw(anim_CurrentLiftable_w), d1, d4);
                         if ((short) d4 != 0) {         // beq.s nothinghit
                             Mem.ww(a5, d7);            // move.w d7,(a5)
                             Mem.ww(Aud_NoiseVol_w, 50);
@@ -1256,6 +1258,36 @@ public final class Newanims {
     }
 
     /** tstdoortoopen (newanims.s:1502) — d5 = open bits ; renvoie d1, pose liftSpeed (d7). */
+    // ================================================================== DIAG portes
+    /** -PdoorTrace=1 : suit l'etat des portes (verrou, type, declenchement). */
+    public static boolean dbgDoors = false;
+    private static final java.util.Map<Integer, Boolean> dbgLocked = new java.util.HashMap<>();
+
+    /** Imprime au CHANGEMENT d'etat de verrou, pour ne pas noyer la sortie. */
+    private static void dbgDoorLock(int porte, int masque) {
+        if (!dbgDoors) {
+            return;
+        }
+        boolean verrouillee = (masque & (1 << (porte & 31))) != 0;
+        Boolean avant = dbgLocked.put(porte, verrouillee);
+        if (avant == null || avant != verrouillee) {
+            System.out.printf("[porte %2d] %s   (masque des verrous = 0x%04X)%n",
+                    porte, verrouillee ? "VERROUILLEE (il manque une cle)" : "libre", masque);
+        }
+    }
+
+    /**
+     * Imprime quand une porte est effectivement declenchee. {@code attendu} est le masque des
+     * declencheurs qu'elle accepte : 0x0100 = touche d'action du joueur 1, 0x0800 = celle du
+     * joueur 2, 0x8000 = porte automatique.
+     */
+    private static void dbgDoorTrigger(int porte, int attendu, int touche) {
+        if (dbgDoors && touche != 0) {
+            System.out.printf("[porte %2d] OUVERTURE (accepte 0x%04X, recu 0x%04X)%n",
+                    porte, attendu & 0xFFFF, touche & 0xFFFF);
+        }
+    }
+
     private static int doorOpenMask(int d5) {
         Mem.ww(anim_ActionSoundFX_w, Mem.uw(anim_OpeningSoundFX_w)); // move.w anim_OpeningSoundFX_w,anim_ActionSoundFX_w
         if ((short) d5 < 1) {                          // cmp.w #1,d5 ; blt door0

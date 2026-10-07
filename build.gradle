@@ -258,6 +258,9 @@ tasks.register('levelTest', JavaExec) {
     if (project.hasProperty('wavOut')) {
         systemProperty 'wavOut', project.property('wavOut').toString()
     }
+    if (project.hasProperty('doorTrace')) {        // DIAG : etat des portes
+        systemProperty 'doorTrace', project.property('doorTrace').toString()
+    }
     if (project.hasProperty('noEnemies')) {         // DIAG : conditions du solo (verrous par cle)
         systemProperty 'noEnemies', project.property('noEnemies').toString()
     }

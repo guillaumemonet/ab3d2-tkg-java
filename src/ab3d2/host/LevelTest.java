@@ -280,6 +280,11 @@ public final class LevelTest {
                 ab3d2.Mem.wb(ab3d2.bss.AiBss.AI_NoEnemies_b, 0xFF);
                 System.out.println("[LevelTest] AI_NoEnemies_b = $FF (verrous par cle actifs)");
             }
+            if ("1".equals(System.getProperty("doorTrace"))) { // DIAG : etat des portes
+                ab3d2.Newanims.dbgDoors = true;
+                System.out.println("[LevelTest] trace des portes activee "
+                        + "(verrou, type de declencheur, ouverture)");
+            }
             if ("1".equals(System.getProperty("testPickup"))) { // DIAG : trace la collecte d'objets
                 ab3d2.Newaliencontrol.dbgCollect = true;
                 System.out.println("[LevelTest] trace collecte (pickup) activée");
