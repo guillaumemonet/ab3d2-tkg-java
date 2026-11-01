@@ -606,12 +606,18 @@ public final class Hireswall {
             return;                                    // rts
         }
         int strip = Mem.b(draw_StripData_b);           // cmp.b #1,draw_StripData_b
+        if (ab3d2.tools.WallPixels.capturing) {        // DIAG : relève la colonne (cf. WallPixels)
+            ab3d2.tools.WallPixels.before(d0, d2, d3, d4, d6, d7, a2, a3, a4, a5, strip);
+        }
         if ((byte) strip < 1) {                        // dbge d6,drawwallPACK0
             DrawWall.drawwallPACK0(d0, d1, d2, d3, d4, d6, d7, a2, a3, a4, a5);
         } else if ((byte) strip == 1) {                // dbne d6,drawwallPACK1
             DrawWall.drawwallPACK1(d0, d1, d2, d3, d4, d6, d7, a2, a3, a4, a5);
         } else {                                       // dble d6,drawwallPACK2
             DrawWall.drawwallPACK2(d0, d1, d2, d3, d4, d6, d7, a2, a3, a4, a5);
+        }
+        if (ab3d2.tools.WallPixels.capturing) {        // DIAG : et les octets qu'elle a écrits
+            ab3d2.tools.WallPixels.after();
         }
     }
 
