@@ -409,7 +409,13 @@ public final class Hires {
             draw_WaterSurface(d1, d2, d5, d7, a3);
             return;
         }
+        if (ab3d2.tools.FloorPixels.capturing) {       // DIAG — relève la tranche (cf. FloorPixels)
+            ab3d2.tools.FloorPixels.before(a3, d7, a1, a0, d5, d2);
+        }
         DrawFloor.draw_GoraudFloor(d1, d2, d5, d7, a0, a1, a3); // bra draw_GoraudFloor
+        if (ab3d2.tools.FloorPixels.capturing) {       // DIAG — et les octets qu'elle a écrits
+            ab3d2.tools.FloorPixels.after();
+        }
     }
 
     /**
