@@ -473,6 +473,9 @@ public final class Hires {
         int a6 = d0;                                   // move.l d0,a6
         a0 = Mem.l(draw_WaterFramePtr_l);              // move.l draw_WaterFramePtr_l,a0
         d3 = setw(d3, Mem.uw(startsmoothx));           // move.w startsmoothx,d3
+        if (ab3d2.tools.WaterPixels.capturing) {       // DIAG — releve la tranche (cf. WaterPixels)
+            ab3d2.tools.WaterPixels.before(a3, d7, a1, a6, a0, d5, d2);
+        }
         d7 = setw(d7, d7 - 1);                         // dbra d7,acrossscrnw
         while ((short) d7 != -1) {
             // acrossscrnw (5729) :
@@ -489,6 +492,9 @@ public final class Hires {
             Mem.wb(a3, Mem.ub(a1 + (d0 & 0xFFFF)));    // move.b (a1,d0.w),(a3)+
             a3 += 1;
             d7 = setw(d7, d7 - 1);                     // dbra d7,acrossscrnw
+        }
+        if (ab3d2.tools.WaterPixels.capturing) {       // DIAG — et les octets qu'elle a ecrits
+            ab3d2.tools.WaterPixels.after();
         }
         // rts
     }
