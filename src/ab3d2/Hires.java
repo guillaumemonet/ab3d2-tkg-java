@@ -399,6 +399,11 @@ public final class Hires {
         // intofirststrip / allintofirst
         // (move.w startsmoothx,d3 — d3 scratch pour les boucles texel)
 
+        if (ab3d2.tools.FloorSpans.capturing) {        // DIAG — relève la tranche, sans dessiner
+            ab3d2.tools.FloorSpans.take(a3, a1, d5, d2);
+            return;
+        }
+
         // tstwat
         if (Mem.b(draw_UseWater_b) != 0) {             // tst.b draw_UseWater_b ; bne draw_WaterSurface
             draw_WaterSurface(d1, d2, d5, d7, a3);
