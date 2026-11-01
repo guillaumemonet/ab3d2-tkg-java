@@ -2819,7 +2819,7 @@ public final class Hires {
     }
 
     /** Tables de luminosité par zone et par point (donetalking, hires.s 1428-1545). */
-    private static void computeZoneBrightness(int listPtr) {
+    public static void computeZoneBrightness(int listPtr) {
         int a1 = Zone_BrightTable_vl;                        // move.l #Zone_BrightTable_vl,a1
         int a2 = Mem.l(Lvl_ZonePtrsPtr_l);                   // move.l Lvl_ZonePtrsPtr_l,a2 (table de ptrs)
         int a0 = listPtr;                                    // move.l Plr*_PotVisibleZoneListPtr_l,a0

@@ -495,7 +495,7 @@ public final class Newanims {
     // ==================================================================
     //  brightanim (newanims.s:690) — avance les animations de luminosité.
     // ==================================================================
-    static void brightanim() {
+    public static void brightanim() {
         int a1 = Anim_BrightTable_vw;                  // move.l #Anim_BrightTable_vw,a1
         int a3 = anim_BrightessAnimPtrs_vl;            // move.l #anim_BrightessAnimPtrs_vl,a3
         int a4 = anim_BrightnessAnimStartPtrs_vl;      // move.l #anim_BrightnessAnimStartPtrs_vl,a4
