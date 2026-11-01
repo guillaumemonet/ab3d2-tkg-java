@@ -206,6 +206,11 @@ public final class Hireswall {
             return;                                    // rts
         }
         // .something_to_draw:
+        // DIAG : relevé des bandes avant texturage (cf. ab3d2.tools.WallStrips).
+        if (ab3d2.tools.WallStrips.capturing) {
+            ab3d2.tools.WallStrips.take(Sys_Workspace_vl, (short) d7 + 1);
+            return;
+        }
         // a1 = ConstantTable_vl (chargé mais non utilisé par scrdrawlop), a0 = Sys_Workspace_vl
         if (Mem.b(Vid_FullScreen_b) != 0) {            // tst.b Vid_FullScreen_b ; bne screendivideFULL
             screendivideFULL(Sys_Workspace_vl, d7);
