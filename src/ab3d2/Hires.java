@@ -412,9 +412,15 @@ public final class Hires {
         if (ab3d2.tools.FloorPixels.capturing) {       // DIAG — relève la tranche (cf. FloorPixels)
             ab3d2.tools.FloorPixels.before(a3, d7, a1, a0, d5, d2);
         }
+        if (ab3d2.tools.GourFloorPixels.capturing) {   // DIAG — idem, dégradé (cf. GourFloorPixels)
+            ab3d2.tools.GourFloorPixels.before(a3, d7, a1, a0, d5, d2);
+        }
         DrawFloor.draw_GoraudFloor(d1, d2, d5, d7, a0, a1, a3); // bra draw_GoraudFloor
         if (ab3d2.tools.FloorPixels.capturing) {       // DIAG — et les octets qu'elle a écrits
             ab3d2.tools.FloorPixels.after();
+        }
+        if (ab3d2.tools.GourFloorPixels.capturing) {   // DIAG — et les octets qu'elle a écrits
+            ab3d2.tools.GourFloorPixels.after();
         }
     }
 
