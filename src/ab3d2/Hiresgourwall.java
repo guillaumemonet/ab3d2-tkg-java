@@ -975,12 +975,18 @@ public final class Hiresgourwall {
             return;                                    // rts
         }
         int strip = Mem.b(draw_StripData_b);           // cmp.b #1,draw_StripData_b
+        if (ab3d2.tools.GourWallPixels.capturing) {    // DIAG : releve la colonne (cf. GourWallPixels)
+            ab3d2.tools.GourWallPixels.before(d0, d3, d4, d5, d6, d7, a2, a3, a5, strip);
+        }
         if ((byte) strip < 1) {                        // dbge d6,drawwallPACK0G
             drawwallPACK0G(d0, d1, d3, d4, d5, d6, d7, a2, a3, a4, a5);
         } else if ((byte) strip == 1) {                // dbne d6,drawwallPACK1G
             drawwallPACK1G(d0, d1, d3, d4, d5, d6, d7, a2, a3, a4, a5);
         } else {                                       // dble d6,drawwallPACK2G
             drawwallPACK2G(d0, d1, d3, d4, d5, d6, d7, a2, a3, a4, a5);
+        }
+        if (ab3d2.tools.GourWallPixels.capturing) {    // DIAG : et les octets qu'elle a ecrits
+            ab3d2.tools.GourWallPixels.after();
         }
     }
 
