@@ -1949,8 +1949,24 @@ public final class Hires {
         Mem.wb(Plr2_Joystick_b, 0);                          // clr.b Plr2_Joystick_b
 
         // Setup constant table
+        Setup_ConstantTable();
+
+        // CALLC Game_Init : commenté dans l'original.
+
+        Controlloop.Game_Start();                           // jsr Game_Start
+
+        startup_fail();                                      // .startup_fail (chute)
+    }
+
+    /**
+     * Remplissage de ConstantTable_vl (hires.s, .fill_const).
+     *
+     * <p>Extrait de _startup pour etre appelable seul : les outils qui n'amorcent
+     * pas le jeu entier en ont besoin, et sans lui la table reste a zero.
+     */
+    public static void Setup_ConstantTable() {
         int a0 = ConstantTable_vl;                           // move.l #ConstantTable_vl,a0
-        d0 = 1;                                              // moveq #1,d0
+        int d0 = 1;                                          // moveq #1,d0
         int d1 = 8191;                                       // move.w #8191,d1
         do {                                                 // .fill_const:
             int d2 = 16384 * 64;                            // move.l #16384*64,d2  (= 1<<20)
@@ -1965,12 +1981,6 @@ public final class Hires {
             Mem.wl(a0, d2); a0 += 4;                        // move.l d2,(a0)+
             d0 += 1;                                        // addq #1,d0
         } while (--d1 != -1);                               // dbra d1,.fill_const
-
-        // CALLC Game_Init : commenté dans l'original.
-
-        Controlloop.Game_Start();                           // jsr Game_Start
-
-        startup_fail();                                      // .startup_fail (chute)
     }
 
     /** .startup_fail : épilogue commun de _startup (Sys_Done). */

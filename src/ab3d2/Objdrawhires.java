@@ -200,7 +200,7 @@ public final class Objdrawhires {
     // ==================================================================
     //  draw_Object (objdrawhires.s:184)
     // ==================================================================
-    static void draw_Object(int d0) {
+    public static void draw_Object(int d0) {
         // DEV_INC.w DrawObjectCallCount
         Mem.ww(DevInst.dev_DrawObjectCallCount_w, Mem.uw(DevInst.dev_DrawObjectCallCount_w) + 1);
 
@@ -728,6 +728,10 @@ public final class Objdrawhires {
         d2 = Mem.l(a3);                                // move.l (a3),d2
         d2 = swap(d2);                                 // swap d2
         a1 = 0;                                        // move.l #0,a1
+        if (ab3d2.tools.BitmapPlace.capturing) {       // DIAG : ou le sprite se pose
+            ab3d2.tools.BitmapPlace.capture(d3, d4, d5, d2, a2, a4); // DIAG
+            return;                                    // DIAG
+        }
         if (Mem.b(draw_LightIt_b) != 0) {              // tst.b draw_LightIt_b ; bne draw_bitmap_lighted
             drawBitmapLighted(d2, d3, d4, d5, d7, a1, a2);
             return;
