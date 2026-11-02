@@ -23,6 +23,9 @@ public final class BitmapPlace {
     /** Arme la capture. */
     public static boolean capturing;
 
+    /** Arrete la routine apres la capture, au lieu de la laisser dessiner. */
+    public static boolean stop = true;
+
     /** Les poses relevées, une par sprite effectivement dessiné. */
     public static final List<int[]> placed = new ArrayList<>();
 

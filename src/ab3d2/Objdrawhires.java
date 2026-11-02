@@ -730,7 +730,9 @@ public final class Objdrawhires {
         a1 = 0;                                        // move.l #0,a1
         if (ab3d2.tools.BitmapPlace.capturing) {       // DIAG : ou le sprite se pose
             ab3d2.tools.BitmapPlace.capture(d3, d4, d5, d2, a2, a4); // DIAG
-            return;                                    // DIAG
+            if (ab3d2.tools.BitmapPlace.stop) {        // DIAG
+                return;                                // DIAG
+            }                                          // DIAG
         }
         if (Mem.b(draw_LightIt_b) != 0) {              // tst.b draw_LightIt_b ; bne draw_bitmap_lighted
             drawBitmapLighted(d2, d3, d4, d5, d7, a1, a2);
