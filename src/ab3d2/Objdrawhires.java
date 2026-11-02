@@ -181,6 +181,10 @@ public final class Objdrawhires {
         }
 
         // .sorted_all
+        if (ab3d2.tools.ObjectOrder.capturing) {       // DIAG : la table, avant le dessin
+            ab3d2.tools.ObjectOrder.capture();         // DIAG
+            return a0;                                 // DIAG
+        }
         a3 = draw_DepthTable_vl;                       // move.l #draw_DepthTable_vl,a3
         while (true) {                                 // .go_back_and_do_another
             int dz = setw(0, Mem.uw(a3));
