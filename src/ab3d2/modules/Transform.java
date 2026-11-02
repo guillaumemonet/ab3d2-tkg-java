@@ -409,7 +409,21 @@ public final class Transform {
         }
     }
 
-    /** RotateObjectPts */
+    /**
+     * RotateObjectPts
+     *
+     * <p>CORRECTIF : la branche « vue encadrée » n'avançait pas a4 dans son chemin principal —
+     * le pointeur d'objet restait collé au premier objet non retiré, et le test
+     * {@code tst.w ObjT_ZoneID_w(a4)} lisait toujours le même secteur. Résultat : les objets
+     * RETIRÉS du niveau (secteur négatif, les 63 emplacements de tir dormants) recevaient une
+     * rotation au lieu du zéro qui les marque. Les trois boucles sœurs — CalcPLR1InLine,
+     * CalcPLR2InLine et RotateObjectPtsFullScreen — font toutes ce NEXT_OBJ ; l'omission est
+     * un saut de ligne du portage, pas un trait de l'original.
+     *
+     * <p>Sans effet visible en jeu : Draw_Objects n'insère que les objets dont le secteur vaut
+     * celui en cours, et un secteur négatif n'en est jamais un. Mais l'entrée ObjRotated_vl
+     * était fausse, et c'est elle qui sert d'oracle au portage pur.
+     */
     public static void RotateObjectPts() {
         int d5 = Mem.uw(HireswallData.Vis_SinVal_w);   // move.w Vis_SinVal_w,d5 ; fetch sine of rotation
         int d6 = Mem.uw(HireswallData.Vis_CosVal_w);   // move.w Vis_CosVal_w,d6 ; cosine
@@ -473,6 +487,7 @@ public final class Transform {
             d2 += Mem.l(HiresData.xwobble);            // add.l xwobble,d2
             Mem.wl(a1, d2); a1 += 4;                   // move.l d2,(a1)+ ; no clue
 
+            a4 += ObjT_SizeOf_l;                       // NEXT_OBJ a4 (manquait : voir ci-dessus)
             if (--d7 == -1) {                          // dbra d7,.objpointrotlop
                 return;                                // rts
             }
