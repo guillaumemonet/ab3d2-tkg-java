@@ -376,6 +376,13 @@ public final class DrawZoneGraph {
             if ((byte) d0 < 0) {                       // tst.b d0 ; blt .end_draw_loop
                 return;                                // .end_draw_loop: rts
             }
+            if (ab3d2.tools.ZonePlan.capturing) {      // DIAG : la mise en scene
+                ab3d2.tools.ZonePlan.capture(d0, a0 - 2); // DIAG
+                if (ab3d2.tools.ZonePlan.stop) {       // DIAG
+                    a0 = ab3d2.tools.ZonePlan.skip(d0, a0); // DIAG
+                    continue;                          // DIAG
+                }                                      // DIAG
+            }                                          // DIAG
             if (d0 == 0) {                             // beq .itsawall
                 // .itsawall:
                 a0 = Hireswall.Draw_Wall(a0);          // jsr Draw_Wall
