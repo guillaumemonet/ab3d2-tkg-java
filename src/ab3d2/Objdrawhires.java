@@ -974,6 +974,13 @@ public final class Objdrawhires {
         // DEV_INC.w VisibleGlareCount
         Mem.ww(DevInst.dev_VisibleGlareCount_w, Mem.uw(DevInst.dev_VisibleGlareCount_w) + 1);
 
+        if (ab3d2.tools.GlarePlace.capturing) {        // DIAG : ou le miroitement se pose
+            ab3d2.tools.GlarePlace.capture(d3, d4, d5, d2, a2); // DIAG
+            if (ab3d2.tools.GlarePlace.stop) {         // DIAG
+                return;                                // DIAG
+            }                                          // DIAG
+        }                                              // DIAG
+
         // ---- draw_right_side_glare (464) ----
         while (true) {
             d7 = swap(d7);                             // swap d7
