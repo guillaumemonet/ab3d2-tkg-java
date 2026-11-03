@@ -1645,9 +1645,6 @@ public final class Objdrawhires {
 
             if (ab3d2.tools.ModelPoints.capturing) {    // DIAG : les points du modele
                 ab3d2.tools.ModelPoints.capture();      // DIAG
-                if (ab3d2.tools.ModelPoints.stop) {     // DIAG
-                    return;                             // DIAG
-                }                                       // DIAG
             }                                           // DIAG
 
             // tri des parts (2097)
@@ -1711,6 +1708,13 @@ public final class Objdrawhires {
                     Mem.ww(a0 + 4, d7);                 // move.w d7,4(a0)
                 }
             }
+
+            if (ab3d2.tools.ModelPoints.capturing) {    // DIAG : les parties, dans l'ordre
+                ab3d2.tools.ModelPoints.captureParts(); // DIAG
+                if (ab3d2.tools.ModelPoints.stop) {     // DIAG
+                    return;                             // DIAG
+                }                                       // DIAG
+            }                                           // DIAG
 
             // doneallparts (2175)
             a0 = draw_PartBuffer_vw;                    // move.l #draw_PartBuffer_vw,a0

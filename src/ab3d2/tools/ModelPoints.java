@@ -46,6 +46,14 @@ public final class ModelPoints {
     /** Les deux cent cinquante-six octets de la grille. */
     public static final int[] grid = new int[256];
 
+    /**
+     * Les PARTIES, dans l'ordre ou elles seront dessinees.
+     *
+     * <p>Deux valeurs chacune : la distance au carre qui a servi au tri — nulle quand le modele
+     * ne trie pas — et le deplacement de sa liste de faces.
+     */
+    public static int[][] parts = new int[0][];
+
     private ModelPoints() {
     }
 
@@ -53,6 +61,21 @@ public final class ModelPoints {
         captured = false;
         points = 0;
         perPoint = new int[0][];
+        parts = new int[0][];
+    }
+
+    /** Le tampon des parties, une fois rempli et trie. */
+    public static void captureParts() {
+        int at = ab3d2.bss.DrawBss.draw_PartBuffer_vw;
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        for (int i = 0; i < 32; i++) {
+            int d = Mem.l(at + i * 8);
+            if (d < 0) {
+                break;
+            }
+            out.add(new int[] {d, Mem.uw(at + i * 8 + 4)});
+        }
+        parts = out.toArray(new int[0][]);
     }
 
     /** Ce que la routine vient de calculer, avant qu'elle ne trie les parties. */
