@@ -1643,6 +1643,13 @@ public final class Objdrawhires {
                 if ((short) d7 == -1) break;
             }
 
+            if (ab3d2.tools.ModelPoints.capturing) {    // DIAG : les points du modele
+                ab3d2.tools.ModelPoints.capture();      // DIAG
+                if (ab3d2.tools.ModelPoints.stop) {     // DIAG
+                    return;                             // DIAG
+                }                                       // DIAG
+            }                                           // DIAG
+
             // tri des parts (2097)
             a1 = Mem.l(LinesPtr);                       // move.l LinesPtr,a1
             a0 = draw_PartBuffer_vw;                    // move.l #draw_PartBuffer_vw,a0
