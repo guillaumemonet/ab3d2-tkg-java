@@ -418,7 +418,7 @@ public final class Objdrawhires {
     // ==================================================================
     //  draw_CalcBrightRings (objdrawhires.s:1415)
     // ==================================================================
-    static void draw_CalcBrightRings() {
+    public static void draw_CalcBrightRings() {  // DIAG : ouvert aux oracles
         int a2 = draw_ResetAngleBrights();             // bsr draw_ResetAngleBrights  (a2 = draw_AngleBrights_vl+32)
 
         int a1 = Mem.l(Lvl_ZoneEdgePtr_l);             // move.l Lvl_ZoneEdgePtr_l,a1
