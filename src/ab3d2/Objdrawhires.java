@@ -1747,6 +1747,7 @@ public final class Objdrawhires {
     static void doapoly(int a1) {
         int d0, d1, d2, d3, d4, d5, d6, d7;
         int a0, a2, a3, a4, a5, a6;
+        final int dbgFaceAt = a1 - Mem.l(draw_StartOfObjPtr_l);  // DIAG
 
         Mem.ww(draw_Left_w, 960);                      // move.w #960,draw_Left_w
         Mem.ww(draw_Right_w, -10);                     // move.w #-10,draw_Right_w
@@ -1774,7 +1775,13 @@ public final class Objdrawhires {
                     else clip = false;                 // (>GUARDBAND déjà traité ; ici dans [-GB,GB])
                     if ((short) d0 > GUARDBAND) clip = true;       // (cmp.w #GUARDBAND,d0 ; ble .notbeh)
                 }
-                if (clip) return;                      // .guard_clip: GETREGS ; bra polybehind
+                if (clip) {                            // .guard_clip: GETREGS ; bra polybehind
+                    if (ab3d2.tools.ModelFaces.capturing) {                 // DIAG
+                        ab3d2.tools.ModelFaces.outcome(dbgFaceAt,           // DIAG
+                                ab3d2.tools.ModelFaces.GUARDED);            // DIAG
+                    }                                                       // DIAG
+                    return;
+                }
                 ca1 += 4;                              // addq #4,a1
                 cd7 = setw(cd7, cd7 - 1);              // dbra d7,checkbeh
                 if ((short) cd7 == -1) break;
@@ -1800,7 +1807,17 @@ public final class Objdrawhires {
         d2 = muls(d2, d3);                              // muls d3,d2
         d0 = muls(d0, d5);                              // muls d5,d0
         d2 = d2 - d0;                                   // sub.l d0,d2
-        if (d2 <= 0) return;                            // ble polybehind
+        if (d2 <= 0) {                                  // ble polybehind
+            if (ab3d2.tools.ModelFaces.capturing) {                         // DIAG
+                ab3d2.tools.ModelFaces.outcome(dbgFaceAt,                   // DIAG
+                        ab3d2.tools.ModelFaces.TURNED);                     // DIAG
+            }                                                               // DIAG
+            return;
+        }
+        if (ab3d2.tools.ModelFaces.capturing) {                             // DIAG
+            ab3d2.tools.ModelFaces.outcome(dbgFaceAt,                       // DIAG
+                    ab3d2.tools.ModelFaces.SHOWN);                          // DIAG
+        }                                                                   // DIAG
 
         // polybright (3D cross product) (2292)
         a3 = draw_3DPointsRotated_vl;                   // move.l #draw_3DPointsRotated_vl,a3
@@ -1917,12 +1934,28 @@ public final class Objdrawhires {
             d1 = setw(d1, (d1 & 0xFFFF) << 8);          // asl.w #8,d1
             a1 = Mem.l(Draw_TexturePalettePtr_l) + 256 * 32; // move.l ...,a1 ; add.l #256*32,a1
             a1 = a1 + (short) d1;                       // add.w d1,a1
+            if (ab3d2.tools.ModelFaces.capturing) {                          // DIAG
+                ab3d2.tools.ModelFaces.shade(dbgFaceAt,                      // DIAG
+                        a0 - Mem.l(Draw_TextureMapsPtr_l),                   // DIAG
+                        a1 - Mem.l(Draw_TexturePalettePtr_l));               // DIAG
+                if (ab3d2.tools.ModelFaces.stop) {                           // DIAG
+                    return;                                                  // DIAG
+                }                                                            // DIAG
+            }                                                                // DIAG
             fillPolyHoles(a0, a1, a2, a4, a6, d7);      // dopolyh
             return;
         }
         if (Mem.b(draw_Gouraud_b) != 0) {              // tst.b draw_Gouraud_b(pc) ; bne gotlurvelyshading
             // gotlurvelyshading (2739)
             a1 = Mem.l(Draw_TexturePalettePtr_l) + 256 * 32; // move.l ...,a1 ; add.l #256*32,a1
+            if (ab3d2.tools.ModelFaces.capturing) {                          // DIAG
+                ab3d2.tools.ModelFaces.shade(dbgFaceAt,                      // DIAG
+                        a0 - Mem.l(Draw_TextureMapsPtr_l),                   // DIAG
+                        a1 - Mem.l(Draw_TexturePalettePtr_l));               // DIAG
+                if (ab3d2.tools.ModelFaces.stop) {                           // DIAG
+                    return;                                                  // DIAG
+                }                                                            // DIAG
+            }                                                                // DIAG
             fillPolyGouraud(a0, a1, a2, a4, a6, d7);    // dopolyg
             return;
         }
@@ -1955,9 +1988,25 @@ public final class Objdrawhires {
         if (Mem.b(draw_PreGouraud_b) != 0) {           // tst.b draw_PreGouraud_b ; bne predoglare
             // predoglare (2576)
             a1 = Mem.l(Draw_TexturePalettePtr_l) - 512; // move.l Draw_TexturePalettePtr_l,a1 ; sub.w #512,a1
+            if (ab3d2.tools.ModelFaces.capturing) {                          // DIAG
+                ab3d2.tools.ModelFaces.shade(dbgFaceAt,                      // DIAG
+                        a0 - Mem.l(Draw_TextureMapsPtr_l),                   // DIAG
+                        a1 - Mem.l(Draw_TexturePalettePtr_l));               // DIAG
+                if (ab3d2.tools.ModelFaces.stop) {                           // DIAG
+                    return;                                                  // DIAG
+                }                                                            // DIAG
+            }                                                                // DIAG
             fillPolyGlare(a0, a1, a2, a4, a6, d7);      // DOGLAREPOLY
             return;
         }
+        if (ab3d2.tools.ModelFaces.capturing) {                          // DIAG
+            ab3d2.tools.ModelFaces.shade(dbgFaceAt,                      // DIAG
+                    a0 - Mem.l(Draw_TextureMapsPtr_l),                   // DIAG
+                    a1 - Mem.l(Draw_TexturePalettePtr_l));               // DIAG
+            if (ab3d2.tools.ModelFaces.stop) {                           // DIAG
+                return;                                                  // DIAG
+            }                                                            // DIAG
+        }                                                                // DIAG
         fillPolyFlat(a0, a1, a2, a4, a6, d7);           // dopoly
     }
 
