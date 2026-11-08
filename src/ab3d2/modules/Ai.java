@@ -1936,8 +1936,13 @@ public final class Ai {
         ai_DoAttackAnim(a0);
     }
 
-    /** ai_DoAttackAnim */
-    private static void ai_DoAttackAnim(int a0) {
+    /**
+     * ai_DoAttackAnim
+     *
+     * <p>DIAG : rendue publique pour l'oracle {@code alienanim}. Aucun changement de
+     * comportement — l'appelant du jeu reste {@code ai_DoWalkAnim}.
+     */
+    public static void ai_DoAttackAnim(int a0) {
         // move.l d0,-(a7) — d0 local
         int a6 = Mem.l(NewaliencontrolData.AlienAnimPtr_l); // move.l AlienAnimPtr_l,a6
         int a5 = Mem.l(WorkspacePtr_l);                // move.l WorkspacePtr_l,a5
