@@ -1862,6 +1862,10 @@ public final class Objdrawhires {
         // dontusegour
         Mem.ww(linedir, Hires.SCREEN_WIDTH);           // move.w #SCREEN_WIDTH,linedir
         a6 = Mem.l(Vid_FastBufferPtr_l);               // move.l Vid_FastBufferPtr_l,a6
+        if (ab3d2.tools.ModelEdges.capturing) {                             // DIAG
+            ab3d2.tools.ModelEdges.bounds(dbgFaceAt, Mem.b(drawit) != 0,     // DIAG
+                    Mem.w(draw_Left_w), Mem.w(draw_Right_w));                // DIAG
+        }                                                                    // DIAG
         if (Mem.b(drawit) == 0) return;                // tst.b drawit(pc) ; beq polybehind
 
         a4 = draw_PolyTopTab_vw;                        // move.l #draw_PolyTopTab_vw,a4
@@ -1879,6 +1883,11 @@ public final class Objdrawhires {
         d7 = setw(d7, d7 - d1);                         // sub.w d1,d7
         if ((short) d7 <= 0) return;                    // ble polybehind
         a2 = (short) d1;                                // move.w d1,a2
+        if (ab3d2.tools.ModelEdges.capturing) {                             // DIAG
+            ab3d2.tools.ModelEdges.span(dbgFaceAt, (short) d1, (short) d7,   // DIAG
+                    draw_PolyTopTab_vw, draw_PolyBotTab_vw);                 // DIAG
+            if (ab3d2.tools.ModelEdges.stop) return;                         // DIAG
+        }                                                                    // DIAG
         d0 = 0;                                         // moveq #0,d0
         a0 = Mem.l(Draw_TextureMapsPtr_l);              // move.l Draw_TextureMapsPtr_l,a0
         d0 = setw(0, Mem.uw(a1));
