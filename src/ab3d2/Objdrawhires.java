@@ -93,10 +93,11 @@ import static ab3d2.ObjectmoveData.AngRet;
  * bitmap » qui se termine par rts à object_behind). Les sprites sont stockés en
  * colonnes verticales 5 bits (3 colonnes par mot 16 bits → PACK0/1/2).
  *
- * AMOD_I = and.w #SINTAB_MASK_IDX (=SINE_SIZE*2-1). Les divs.l approchées par
- * 1/N (OneOverN_vw) de l'ASM d'origine ne sont PAS portées ici : on garde les
- * divisions exactes (USE_16X16_TEXEL_MULS non défini → branche MUL_INV 32 bits ;
- * mais Draw_Objects utilise des divs.w/divu.w directs, traduits tels quels).
+ * AMOD_I = and.w #SINTAB_MASK_IDX (=SINE_SIZE*2-1). Les divs.l des remplisseurs
+ * de polygones sont bien approchées par 1/N (OneOverN_vw), et la macro MUL_INV
+ * est celle que le Makefile assemble : USE_16X16_TEXEL_MULS EST défini (voir
+ * AFLAGS), donc la branche 16x16 — swap, muls.w, lsl.l #2 — et non la branche
+ * 32 bits. Draw_Objects, lui, utilise des divs.w/divu.w directs.
  */
 public final class Objdrawhires {
 
@@ -2019,7 +2020,7 @@ public final class Objdrawhires {
         fillPolyFlat(a0, a1, a2, a4, a6, d7);           // dopoly
     }
 
-    // --- MUL_INV_PAIR (USE_16X16_TEXEL_MULS non défini) : modifie {d3,d4} via réciproque d0 ---
+    // --- MUL_INV_PAIR (USE_16X16_TEXEL_MULS défini) : modifie {d3,d4} via réciproque d0 ---
     // Implémenté inline aux points d'usage (ext.l d0 ; asr.l#8 ; muls.l ; asr.l#6).
 
     // Offset constant entre les tables top/bot (records de 16 octets par colonne).
@@ -2068,7 +2069,7 @@ public final class Objdrawhires {
                             int sdiv = d0;             // move.w d0,-2(sp)
                             if ((d0 & 0xFFFF) > MAX_ONE_OVER_N) d0 = setw(d0, MAX_ONE_OVER_N);
                             d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                            d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6; // MUL_INV_PAIR
+                            d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2; // MUL_INV_PAIR
                             d0 = setw(d0, sdiv);       // restore divisor
                             d5 = d5 + d3;              // add.l d3,d5
                             d6 = d6 + d4;              // add.l d4,d6
@@ -2077,12 +2078,15 @@ public final class Objdrawhires {
                         // .notofftop
                         if ((d0 & 0xFFFF) > MAX_ONE_OVER_N) d0 = setw(d0, MAX_ONE_OVER_N);
                         d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                        d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6; // MUL_INV_PAIR
+                        d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2; // MUL_INV_PAIR
                         a3 = a3 + Mem.l(ontoscr + (d1 & 0xFFFF) * 4); // add.l ontoscr(pc,d1.w*4),a3
                         d1 = dbgCheesy ? 0x1fffff : 0x3fffff; // move.l #$3fffff,d1 (CHEESEY=0) / #$1fffff (CHEESEY=1)
                         a5 = d3;                       // move.l d3,a5
                         d3 = 0;                        // moveq #0,d3
                         d2 = setw(d2, d2 - 1);         // subq #1,d2
+                        if (ab3d2.tools.ModelPixels.capturing) {               // DIAG
+                            ab3d2.tools.ModelPixels.before(a3, (short) d2 + 1);  // DIAG
+                        }                                                        // DIAG
                         while (true) {                 // drawpol
                             d5 = d5 & d1;              // and.l d1,d5
                             d6 = d6 & d1;              // and.l d1,d6
@@ -2093,11 +2097,14 @@ public final class Objdrawhires {
                             d5 = swap(d5);             // swap d5
                             d5 = d5 + a5;              // add.l a5,d5
                             d6 = d6 + d4;              // add.l d4,d6
-                            Mem.wb(a3, Mem.ub(a1 + (d3 & 0xFFFF))); // move.b (a1,d3.w),(a3)
+                            Mem.wb(a3, Mem.ub(a1 + (short) d3));   // move.b (a1,d3.w),(a3) : index SIGNE
                             a3 = a3 + Hires.SCREEN_WIDTH; // adda.w #SCREEN_WIDTH,a3
                             d2 = setw(d2, d2 - 1);
                             if ((short) d2 == -1) break; // dbra d2,drawpol
                         }
+                        if (ab3d2.tools.ModelPixels.capturing) {                 // DIAG
+                            ab3d2.tools.ModelPixels.after();                     // DIAG
+                        }                                                        // DIAG
                     }
                 }
             }
@@ -2150,7 +2157,7 @@ public final class Objdrawhires {
                             d3 = d3 * Mem.l(offtopby - 2);
                             d4 = d4 * Mem.l(offtopby - 2);
                             d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                            d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                            d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                             d0 = setw(d0, sdiv);
                             d5 = d5 + d3;
                             d6 = d6 + d4;
@@ -2158,12 +2165,15 @@ public final class Objdrawhires {
                         }
                         if ((d0 & 0xFFFF) > MAX_ONE_OVER_N) d0 = setw(d0, MAX_ONE_OVER_N);
                         d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                        d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                        d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                         a3 = a3 + Mem.l(ontoscrGL + (d1 & 0xFFFF) * 4); // add.l ontoscrGL(pc,d1.w*4),a3
                         d1 = dbgCheesy ? 0x1fffff : 0x3fffff;
                         a5 = d3;
                         d3 = 0;
                         d2 = setw(d2, d2 - 1);
+                        if (ab3d2.tools.ModelPixels.capturing) {               // DIAG
+                            ab3d2.tools.ModelPixels.before(a3, (short) d2 + 1);  // DIAG
+                        }                                                        // DIAG
                         while (true) {                 // drawpolGL
                             d5 = d5 & d1;
                             d6 = d6 & d1;
@@ -2178,7 +2188,7 @@ public final class Objdrawhires {
                                 d5 = swap(d5);         // swap d5
                                 d5 = d5 + a5;          // add.l a5,d5
                                 d6 = d6 + d4;          // add.l d4,d6
-                                Mem.wb(a3, Mem.ub(a1 + (d3 & 0xFFFF))); // move.b (a1,d3.w),(a3)
+                                Mem.wb(a3, Mem.ub(a1 + (short) d3));   // move.b (a1,d3.w),(a3) : index SIGNE
                             } else {
                                 // itsblack
                                 d5 = swap(d5);         // swap d5
@@ -2189,6 +2199,9 @@ public final class Objdrawhires {
                             d2 = setw(d2, d2 - 1);
                             if ((short) d2 == -1) break; // dbra d2,drawpolGL
                         }
+                        if (ab3d2.tools.ModelPixels.capturing) {                 // DIAG
+                            ab3d2.tools.ModelPixels.after();                     // DIAG
+                        }                                                        // DIAG
                     }
                 }
             }
@@ -2240,7 +2253,7 @@ public final class Objdrawhires {
                             d3 = d3 * Mem.l(offtopby - 2);
                             d4 = d4 * Mem.l(offtopby - 2);
                             d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                            d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                            d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                             d0 = setw(d0, sdiv);
                             d5 = d5 + d3;
                             d6 = d6 + d4;
@@ -2248,7 +2261,7 @@ public final class Objdrawhires {
                         }
                         if ((d0 & 0xFFFF) > MAX_ONE_OVER_N) d0 = setw(d0, MAX_ONE_OVER_N);
                         d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                        d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                        d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                         a3 = a3 + Mem.l(ontoscrg + (d1 & 0xFFFF) * 4); // add.l ontoscrg(pc,d1.w*4),a3
                         d1 = setw(0, Mem.uw(a4 + 10 + POLYBOT_OFS)); // move.w 10+PolyBot-PolyTop(a4),d1
                         d7 = setw(0, Mem.uw(a4 + 10)); // move.w 10(a4),d7
@@ -2256,7 +2269,7 @@ public final class Objdrawhires {
                         d7 = setw(d7, (d7 & 0xFFFF) << 8); // asl.w #8,d7
                         d1 = swap(d1);                 // swap d1
                         d1 = setw(d1, 0);              // clr.w d1
-                        d1 = (d1 >> 8) * d0; d1 >>= 6; // MUL_INV d0,d1
+                        d1 = (short) swap(d1) * (short) d0; d1 <<= 2; // MUL_INV d0,d1
                         d1 = d1 >> 8;                  // asr.l #8,d1
                         a5 = d3;                       // move.l d3,a5
                         d3 = 0;                        // moveq #0,d3
@@ -2265,6 +2278,9 @@ public final class Objdrawhires {
                         d2 = swap(d2);                 // swap d2
                         d1 = dbgCheesy ? 0x1fffff : 0x3fffff; // move.l #$3fffff,d1
                         d2 = setw(d2, d2 - 1);         // subq.w #1,d2
+                        if (ab3d2.tools.ModelPixels.capturing) {               // DIAG
+                            ab3d2.tools.ModelPixels.before(a3, (short) d2 + 1);  // DIAG
+                        }                                                        // DIAG
                         while (true) {                 // drawpolg
                             d5 = d5 & d1;
                             d6 = d6 & d1;
@@ -2279,11 +2295,14 @@ public final class Objdrawhires {
                             d6 = d6 + d4;              // add.l d4,d6
                             d7 = setw(d7, d7 + d2);    // add.w d2,d7
                             d2 = swap(d2);             // swap d2
-                            Mem.wb(a3, Mem.ub(a1 + (d3 & 0xFFFF))); // move.b (a1,d3.w),(a3)
+                            Mem.wb(a3, Mem.ub(a1 + (short) d3));   // move.b (a1,d3.w),(a3) : index SIGNE
                             a3 = a3 + Hires.SCREEN_WIDTH; // adda.w #SCREEN_WIDTH,a3
                             d2 = setw(d2, d2 - 1);
                             if ((short) d2 == -1) break; // dbra d2,drawpolg
                         }
+                        if (ab3d2.tools.ModelPixels.capturing) {                 // DIAG
+                            ab3d2.tools.ModelPixels.after();                     // DIAG
+                        }                                                        // DIAG
                     }
                 }
             }
@@ -2336,7 +2355,7 @@ public final class Objdrawhires {
                             d3 = d3 * Mem.l(offtopby - 2);
                             d4 = d4 * Mem.l(offtopby - 2);
                             d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                            d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                            d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                             d0 = setw(d0, sdiv);
                             d5 = d5 + d3;
                             d6 = d6 + d4;
@@ -2344,12 +2363,15 @@ public final class Objdrawhires {
                         }
                         if ((d0 & 0xFFFF) > MAX_ONE_OVER_N) d0 = setw(d0, MAX_ONE_OVER_N);
                         d0 = setw(d0, Mem.uw(OneOverN_vw + (d0 & 0xFFFF) * 2));
-                        d0 = (short) d0; d3 = (d3 >> 8) * d0; d4 = (d4 >> 8) * d0; d3 >>= 6; d4 >>= 6;
+                        d3 = (short) swap(d3) * (short) d0; d4 = (short) swap(d4) * (short) d0; d3 <<= 2; d4 <<= 2;
                         a3 = a3 + Mem.l(ontoscrh + (d1 & 0xFFFF) * 4); // add.l ontoscrh(pc,d1.w*4),a3
                         d1 = dbgCheesy ? 0x1fffff : 0x3fffff;
                         a5 = d3;
                         d3 = 0;
                         d2 = setw(d2, d2 - 1);
+                        if (ab3d2.tools.ModelPixels.capturing) {               // DIAG
+                            ab3d2.tools.ModelPixels.before(a3, (short) d2 + 1);  // DIAG
+                        }                                                        // DIAG
                         while (true) {                 // drawpolh
                             d5 = d5 & d1;
                             d6 = d6 & d1;
@@ -2361,13 +2383,16 @@ public final class Objdrawhires {
                             d6 = d6 + d4;              // add.l d4,d6
                             d3 = setb(d3, Mem.ub(a0 + (d0 & 0xFFFF) * (dbgCheesy ? 1 : 4))); // move.b (a0,d0.w*4),d3
                             if ((d3 & 0xFF) != 0) {    // beq.s .dontplot
-                                Mem.wb(a3, Mem.ub(a1 + (d3 & 0xFFFF))); // move.b (a1,d3.w),(a3)
+                                Mem.wb(a3, Mem.ub(a1 + (short) d3));   // move.b (a1,d3.w),(a3) : index SIGNE
                             }
                             // .dontplot
                             a3 = a3 + Hires.SCREEN_WIDTH; // adda.w #SCREEN_WIDTH,a3
                             d2 = setw(d2, d2 - 1);
                             if ((short) d2 == -1) break; // dbra d2,drawpolh
                         }
+                        if (ab3d2.tools.ModelPixels.capturing) {                 // DIAG
+                            ab3d2.tools.ModelPixels.after();                     // DIAG
+                        }                                                        // DIAG
                     }
                 }
             }
