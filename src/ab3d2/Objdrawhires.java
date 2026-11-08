@@ -578,6 +578,9 @@ public final class Objdrawhires {
         a6 = a6 + GLFT_FrameData_l;                    // lea GLFT_FrameData_l(a6),a6
         a5 = Draw_ObjectPtrs_vl;                       // move.l #Draw_ObjectPtrs_vl,a5
         d7 = setw(0, Mem.uw(a0 + 2));                  // move.w 2(a0),d7
+        if (ab3d2.tools.LitPalette.capturing) {           // DIAG
+            ab3d2.tools.LitPalette.sheet = (short) d7;
+        }
         d7 = setw(d7, (d7 & 0xFFFF) << 4);             // asl.w #4,d7
         a5 = a5 + (short) d7;                          // adda.w d7,a5
         d7 = setw(d7, (d7 & 0xFFFF) << 4);             // asl.w #4,d7
@@ -1180,6 +1183,9 @@ public final class Objdrawhires {
         a1 = a1 + Mem.l(draw_TempPtr_l);               // add.l draw_TempPtr_l,a1
         d2 = muls(d2, 7 * 16);                         // muls #7*16,d2
         a1 = a1 + d2;                                  // add.l d2,a1
+        if (ab3d2.tools.LitPalette.capturing) {        // DIAG
+            ab3d2.tools.LitPalette.base = a1 - guff;
+        }
         d0 = setw(0, Mem.uw(Plr1_TmpAngPos_w));        // move.w Plr1_TmpAngPos_w,d0
         d0 = setw(d0, -(short) d0);                    // neg.w d0
         d0 = setw(d0, d0 + SINE_SIZE);                 // add.w #SINE_SIZE,d0
@@ -1217,7 +1223,7 @@ public final class Objdrawhires {
             d2 = setw(0, d0);                          // move.w d0,d2
             d2 = setw(d2, d2 + Mem.uw(a1));
             a1 += 2;                                   // add.w (a1)+,d2
-            if ((short) d2 <= 0) d2 = 0;               // ble.s .nopos ; moveq #0,d2
+            if ((short) d2 > 0) d2 = 0;                // ble.s .nopos (saute le clear) ; moveq #0,d2
             // .nopos
             Mem.ww(a0, Mem.uw(a0) + d2);
             a0 += 2;                                   // add.w d2,(a0)+
@@ -1246,6 +1252,9 @@ public final class Objdrawhires {
             // .okpos
             if ((short) d1 >= 31) d1 = setw(d1, 31);   // cmp.w #31,d1 ; blt.s .okneg ; move.w #31,d1
             // .okneg
+            if (ab3d2.tools.LitPalette.capturing) {    // DIAG
+                ab3d2.tools.LitPalette.clarte(d1);
+            }
             Mem.wl(a3, Mem.l(a1 + (d1 & 0xFFFF) * 8));
             a3 += 4;                                   // move.l (a1,d1.w*8),(a3)+
             Mem.wb(a3 - 4, 0);                         // move.b #0,-4(a3)
@@ -1253,6 +1262,9 @@ public final class Objdrawhires {
             a3 += 4;                                   // move.l 4(a1,d1.w*8),(a3)+
             d0 = setw(d0, d0 - 1);                     // dbra d0,.make_pals_loop
             if ((short) d0 == -1) break;
+        }
+        if (ab3d2.tools.LitPalette.capturing) {        // DIAG
+            ab3d2.tools.LitPalette.built(draw_Pals_vl, 4 * 2 * 49);
         }
         // --- GETREGS : restaure d2/d3/d4/d5/d7 (et a1/a2 = a1in/a2in) ---
         d2 = sd2;
