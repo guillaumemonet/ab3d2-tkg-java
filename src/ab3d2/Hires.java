@@ -2914,7 +2914,7 @@ public final class Hires {
     }
 
     /** Marque les zones PVS visibles (bitmask) + worry des aliens vus (hires.s 1988-2061). */
-    private static void markVisibleAndWorry() {
+    public static void markVisibleAndWorry() {
         int a0 = Mem.l(PlayerBss.Plr2_ZonePtr_l);            // move.l Plr2_ZonePtr_l,a0
         int a1 = ab3d2.bss.SystemBss.Sys_Workspace_vl;       // move.l #Sys_Workspace_vl,a1
         for (int i = 0; i < 32; i += 4) Mem.wl(a1 + i, 0);   // clr.l (a1)..28(a1)
