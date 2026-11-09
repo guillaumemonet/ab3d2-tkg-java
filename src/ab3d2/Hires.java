@@ -1855,7 +1855,10 @@ public final class Hires {
         while (true) {                                 // FindChannel
             if (Mem.b(a3) == 0) {                      // tst.b (a3) ; bne.s .notactive
                 if ((short) Mem.uw(a3 + 32) == (short) d0) { foundMine = true; break; } // cmp.w 32(a3),d0 ; beq FOUNDMYCHAN
-                if ((short) Mem.uw(a3 + 2) >= (short) d2) { // cmp.w 2(a3),d2 ; blt.s .notactive
+                // cmp.w 2(a3),d2 calcule d2 - imp ; blt saute quand d2 < imp, donc on TRAITE
+                // quand d2 >= imp — comme la voie stereo juste au-dessus. Le test etait
+                // inverse ici, et en mono plus aucun son n'etait place.
+                if ((short) d2 >= (short) Mem.uw(a3 + 2)) { // cmp.w 2(a3),d2 ; blt.s .notactive
                     d2 = setw(d2, Mem.uw(a3 + 2));     // move.w 2(a3),d2
                     a2 = a3;                           // move.l a3,a2
                     d6 = setw(d5, d5 + 1);             // move.w d5,d6 ; add.w #1,d6
@@ -4672,7 +4675,7 @@ public final class Hires {
     public static int dbgMaxSoftVol = 0;   // DIAG : max des 8 volumes de voies soft vus
     public static int dbgMaxSfxPaulaVol = 0; // DIAG : max audVOL[1..3] (canaux SFX)
 
-    static void newsampbitl() {
+    public static void newsampbitl() {
         CustomChips.write16(0xdff09c, 0x200);                 // move.w #$200,intreq (clr IRQ audio, no-op hôte)
         if (dbgTestSfx >= 0 || dbgForceFire) {                // DIAG : trace l'activité SFX
             int m = Math.max(Math.max(Math.max(Mem.ub(vol0left), Mem.ub(vol0right)), Math.max(Mem.ub(vol1left), Mem.ub(vol1right))),
