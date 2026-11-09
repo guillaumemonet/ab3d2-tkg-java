@@ -3872,7 +3872,7 @@ public final class Hires {
      * QUIRKs préservés (asymétries de l'original) : le bloc J1 fait SnapYVel + clear
      * impacts ; le bloc J2 aussi (mais via une variante sans le « twist » d4).
      */
-    static void Plr1_Use() {
+    public static void Plr1_Use() {
         int a0 = Mem.l(PlayerBss.Plr1_ObjectPtr_l);          // move.l Plr1_ObjectPtr_l,a0
         Mem.wb(a0 + Defs.ObjT_TypeID_b, Defs.OBJ_TYPE_PLAYER1); // move.b #OBJ_TYPE_PLAYER1,ObjT_TypeID_b(a0)
         int a1 = Mem.l(Lvl_ObjectPointsPtr_l);               // move.l Lvl_ObjectPointsPtr_l,a1

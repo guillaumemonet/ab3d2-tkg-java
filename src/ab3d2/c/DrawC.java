@@ -72,11 +72,11 @@ public final class DrawC {
     private static final int PLANE_PLANE_SIZE = SCREEN_WIDTH * SCREEN_HEIGHT / SCREEN_DEPTH; // 10240
 
     // -- buffers statiques des digits de bordure (remplis par Draw_Init, §3) --
-    private static final int draw_BorderDigitsGood = Mem.alloc(DRAW_HUD_CHAR_W * DRAW_HUD_CHAR_H * 10);          // 560
-    private static final int draw_BorderDigitsWarn = Mem.alloc(DRAW_HUD_CHAR_W * DRAW_HUD_CHAR_H * 10);          // 560
-    private static final int draw_BorderDigitsItem = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10); // 400
-    private static final int draw_BorderDigitsItemFound = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10);
-    private static final int draw_BorderDigitsItemSelected = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10);
+    public static final int draw_BorderDigitsGood = Mem.alloc(DRAW_HUD_CHAR_W * DRAW_HUD_CHAR_H * 10);          // 560
+    public static final int draw_BorderDigitsWarn = Mem.alloc(DRAW_HUD_CHAR_W * DRAW_HUD_CHAR_H * 10);          // 560
+    public static final int draw_BorderDigitsItem = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10); // 400
+    public static final int draw_BorderDigitsItemFound = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10);
+    public static final int draw_BorderDigitsItemSelected = Mem.alloc(DRAW_HUD_CHAR_SMALL_W * DRAW_HUD_CHAR_SMALL_H * 10);
     private static final int draw_BorderDigitsBuffer = Mem.alloc(DRAW_HUD_CHAR_SMALL_H * DRAW_HUD_CHAR_SMALL_W * 10); // 400
 
     /** draw.c : static UBYTE draw_Border[SCREEN_WIDTH*SCREEN_HEIGHT] — bordure HUD chunky (construite par Draw_Init §3). */
