@@ -1689,7 +1689,7 @@ public final class Newanims {
     //  Status!=0 : animation d'impact ("popping"). Status==0 : vol (anim, collision
     //  sol/plafond/mur avec rebond, gravité, MoveObject, explosion, hit ennemis).
     // ==================================================================
-    static void ItsABullet(int a0) {
+    public static void ItsABullet(int a0) {
         Mem.wb(timeout, 0);                            // move.b #0,timeout
         int d0 = setw(0, Mem.uw(a0 + ObjT_ZoneID_w));  // move.w ObjT_ZoneID_w(a0),d0
         Mem.ww(a0 + EntT_ZoneID_w, d0);                // move.w d0,EntT_ZoneID_w(a0)
