@@ -1418,7 +1418,7 @@ public final class Newanims {
     //  ComputeBlast (newanims.s:2845) — dégâts de zone (splash) + flammes.
     //  d0 = force explosive ; a0 = objet source (la balle).
     // ==================================================================
-    static void ComputeBlast(int d0, int a0) {
+    public static void ComputeBlast(int d0, int a0) {   // DIAG : publique pour l oracle du souffle
         Mem.ww(anim_DoneFlames_w, 0);                  // clr.w anim_DoneFlames_w
         int d6 = setw(0, d0);                          // move.w d0,d6
         Mem.ww(anim_MaxDamage_w, d0);                  // move.w d0,anim_MaxDamage_w
@@ -1633,7 +1633,7 @@ public final class Newanims {
                 Mem.wl(Obj_ZonePtr_l, Mem.l(anim_MiddleRoom_l)); // move.l anim_MiddleRoom_l,Obj_ZonePtr_l
                 // movem save d5/d6/a0/a1/a3/d7/a6 (pass by value)
                 Mem.ww(Obj_ExtLen_w, 80);              // move.w #80,Obj_ExtLen_w
-                Mem.wb(Obj_AwayFromWall_b, 1);         // move.b #1,Obj_AwayFromWall_b
+                Mem.wb(Obj_AwayFromWall_b, 1);              // move.b #1,Obj_AwayFromWall_b
                 Objectmove.MoveObject();               // jsr MoveObject
                 int a2f = Mem.l(Obj_ZonePtr_l);        // move.l Obj_ZonePtr_l,a2
                 Mem.ww(a3 + 12, Mem.uw(a2f));          // move.w (a2),12(a3)
@@ -1645,8 +1645,11 @@ public final class Newanims {
                     droof = Mem.l(a2f + ZoneT_UpperRoof_l);   // move.l ZoneT_UpperRoof_l(a2),d2
                 }
                 // .okinbot
-                if (dfloor > d0) d0 = dfloor;          // cmp.l d0,d1 ; bgt .abovefloor ; move.l d1,d0
-                if (droof < d0) d0 = droof;            // cmp.l d0,d2 ; blt .belowroof ; move.l d2,d0
+                // cmp.l d0,d1 calcule d1-d0 : bgt saute quand le SOL est au-dessus de newy,
+                // donc l affectation a lieu quand il est AU-DESSOUS. Les deux tests etaient
+                // inverses ici, et la flamme nee sous le sol remontait au PLAFOND.
+                if (dfloor <= d0) d0 = dfloor;         // cmp.l d0,d1 ; bgt .abovefloor ; move.l d1,d0
+                if (droof >= d0) d0 = droof;           // cmp.l d0,d2 ; blt .belowroof ; move.l d2,d0
                 // .belowroof
                 Mem.wl(a3 + ShotT_AccYPos_w, d0);      // move.l d0,ShotT_AccYPos_w(a3)
                 d0 = d0 >> 7;                          // asr.l #7,d0
