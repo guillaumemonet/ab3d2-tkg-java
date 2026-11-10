@@ -731,7 +731,7 @@ public final class Newanims {
     // ==================================================================
     private static final int DOALIFT = 0, BACKFROMLIFT = 1, LIFT_SIMPLE = 2;
 
-    static void LiftRoutine() {
+    public static void LiftRoutine() {
         int d0 = 0, d1 = 0, d2, d3 = 0, d4 = 0, d5 = 0, d6, d7 = 0;
         int a0, a1, a3 = 0, a5 = 0;
         int a6 = anim_LiftHeightTable_vw;              // move.l #anim_LiftHeightTable_vw,a6
@@ -1036,7 +1036,7 @@ public final class Newanims {
     // ==================================================================
     private static final int DOADOOR = 0, BACKFROMTST = 1, DOOR_SIMPLE = 2;
 
-    static void DoorRoutine() {
+    public static void DoorRoutine() {
         int d0 = 0, d1 = 0, d2, d3 = 0, d4 = 0, d5 = 0, d6, d7 = 0;
         int a0, a1, a3 = 0, a5 = 0;
         int a6 = anim_DoorOpenTimers_vw;               // move.l #anim_DoorOpenTimers_vw,a6
@@ -1182,7 +1182,7 @@ public final class Newanims {
                         d4 = setb(0, Mem.ub(a0)); a0 += 1; // moveq #0,d4 ; move.b (a0)+,d4  (close bits)
                         if (Mem.b(anim_DoorOpen_b) != 0) {        // tst.b anim_DoorOpen_b ; bne tstdoortoclose
                             liftSpeed = d7;
-                            d1 = doorCloseMask(a6);    // tstdoortoclose → d1
+                            d1 = doorCloseMask(a6, d4); // tstdoortoclose → d1 (d4 = octet 35)
                             d7 = liftSpeed;
                         } else if (Mem.b(anim_DoorClosed_b) != 0) { // tst.b anim_DoorClosed_b ; bne tstdoortoopen
                             liftSpeed = d7;
@@ -1313,14 +1313,21 @@ public final class Newanims {
         }
     }
 
-    /** tstdoortoclose (newanims.s:1560) — timer d'ouverture ; renvoie d1, pose liftSpeed (d7). a6 = timer. */
-    private static int doorCloseMask(int a6) {
+    /**
+     * tstdoortoclose (newanims.s:1560) — timer d'ouverture ; renvoie d1, pose liftSpeed (d7).
+     * a6 = timer.
+     *
+     * <p>d4 ARRIVE DEJA GARNI : .satisfied y a mis l'octet 35 de la porte, et rien ne le remet
+     * a zéro ici. Une porte dont cet octet est non nul tombe donc toujours dans dclose1 et ne
+     * se referme JAMAIS d'elle-même, quelle que soit sa durée d'ouverture. C'est le cas de la
+     * plupart des portes du jeu.
+     */
+    private static int doorCloseMask(int a6, int d4) {
         int d1 = setw(0, Mem.uw(Anim_TempFrames_w));   // move.w Anim_TempFrames_w,d1
         d1 = setw(d1, d1 + Mem.uw(a6));                // add.w (a6),d1
         Mem.ww(a6, d1);                                // move.w d1,(a6)
-        int d4 = 0;
         if ((short) d1 < (short) Mem.uw(anim_OpenDuration_w)) { // cmp.w anim_OpenDuration_w,d1 ; bge .oktoclose
-            d4 = setw(0, 1);                           // move.w #1,d4
+            d4 = setw(d4, 1);                          // move.w #1,d4
         }
         // .oktoclose
         Mem.ww(anim_ActionSoundFX_w, Mem.uw(anim_ClosingSoundFX_w)); // move.w anim_ClosingSoundFX_w,anim_ActionSoundFX_w
