@@ -319,7 +319,11 @@ public final class LevelTest {
                 Hires.dbgAiAliens = Integer.parseInt(System.getProperty("aiTrace"));
             }
             System.out.println("[LevelTest] Game_Begin (niveau " + level + ", " + frames + " frames)...");
+            if (System.getProperty("gourSpans") != null) {   // DIAG : armer le releve
+                ab3d2.tools.GourFloorPixels.capturing = true;
+            }
             Hires.Game_Begin();
+            ab3d2.tools.GourFloorPixels.capturing = false;
             System.out.println("[LevelTest] Game_Begin terminé.");
             if (System.getProperty("dumpWallTex") != null) { // DIAG Phase 2b : décodage texture murale → PNG
                 int N = Integer.parseInt(System.getProperty("dumpWallTex"));
@@ -482,6 +486,19 @@ public final class LevelTest {
                     System.out.printf("    idx=%3d ×%-4d  R=%3d G=%3d B=%3d%n",
                         e.getKey(), e.getValue(), (argb>>16)&0xFF, (argb>>8)&0xFF, argb&0xFF);
                 });
+            }
+            if (System.getProperty("gourSpans") != null) {   // DIAG : tranches des sols degrades
+                StringBuilder sb = new StringBuilder();
+                for (int[] t : ab3d2.tools.GourFloorPixels.spans) {
+                    sb.append("[gourSpan] ").append(t[0]).append(' ').append(t[1])
+                      .append(' ').append(t[2]).append(' ').append(t[3])
+                      .append(' ').append(t[4]).append(' ').append(t[6])
+                      .append(' ').append(t[7]).append(' ').append(t[8])
+                      .append('\n');
+                }
+                System.out.print(sb);
+                System.out.println("[gourSpan] total "
+                        + ab3d2.tools.GourFloorPixels.spans.size());
             }
             if (System.getProperty("dumpBrights") != null) {  // DIAG : luminosites de points calculees
                 int zone = Integer.parseInt(System.getProperty("dumpBrights"));

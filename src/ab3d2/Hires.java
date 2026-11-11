@@ -566,6 +566,8 @@ public final class Hires {
             return a0;                                 // dontdrawfloor: rts
         }
 
+        int d1x = 0;                                   // DIAG
+        int d7x = 0;                                   // DIAG
         int savedA0 = a0;                              // move.l a0,-(a7)  (pix1h/pix2h)
         a4 = LeftSideTable_vw;                         // move.l #LeftSideTable_vw,a4
         d1 = setw(0, Mem.uw(top));                     // move.w top(pc),d1
@@ -685,9 +687,19 @@ public final class Hires {
             if ((short) d7 <= 0) return savedA0;       // ble predontdrawfloor
             d0 = setw(d0, d1);                         // move.w d1,d0
             if ((short) d0 == 0) d0 = 1;               // bne.s .notzero ; moveq #1,d0
+            d1x = d1;                                  // DIAG
+            d7x = d7;                                  // DIAG
             d1 = muls(Mem.uw(linedir), d1);            // muls linedir,d1
             a6 = a6 + d1;                              // add.l d1,a6
             Mem.ww(tonextline, 2);                     // move.w #2,tonextline
+        }
+
+        if (ab3d2.tools.GourFloorPixels.capturing) {   // DIAG — la surface et son etendue
+            System.out.println("[gourFlat] above=" + (short) Mem.uw(above)
+                    + " top=" + (short) Mem.uw(top) + " bottom=" + (short) Mem.uw(bottom)
+                    + " premiere=" + (short) d1x + " lignes=" + (short) d7x
+                    + " tuile=" + Mem.uw(whichtile)
+                    + " centreY=" + Mem.uw(Vid_CentreY_w));
         }
 
         // pix2h (4777) — dispatch boucle de lignes.
@@ -3385,6 +3397,9 @@ public final class Hires {
      * mais non empruntées en solo ; voir QUIRKs a6/d2 (registres hérités, sans effet solo).
      */
     static void DrawDisplay() {
+        if (ab3d2.tools.GourFloorPixels.capturing) {         // DIAG — une image a la fois
+            ab3d2.tools.GourFloorPixels.reset();
+        }
         Mem.wb(fillscrnwater, 0);                            // clr.b fillscrnwater
 
         int a0 = SinCosTable_vw;                             // move.l #SinCosTable_vw,a0
