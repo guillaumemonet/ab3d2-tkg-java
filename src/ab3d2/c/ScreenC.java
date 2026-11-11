@@ -304,7 +304,8 @@ public final class ScreenC {
      * les decalages de la table sont donc RELATIFS au groupe courant, pas au debut de la ligne.
      * (Cet {@code addq} manquait : l'ecran se reduisait a des trainees horizontales.)
      */
-    private static void applyTeleportShimmer(int srcChunky, int dstChunky, int frame) {
+    // Rendue PUBLIQUE pour l'oracle de la dematerialisation (rebirth/ShimmerExport).
+    public static void applyTeleportShimmer(int srcChunky, int dstChunky, int frame) {
         byte[] ram = Mem.RAM;
         int shimBase = draw_TeleportShimmerFXData_vb + (frame << 10); // frame*1024
         int a6Off = 0;                                       // décalage courant dans la table
