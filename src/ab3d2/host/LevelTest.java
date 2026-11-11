@@ -490,6 +490,9 @@ public final class LevelTest {
                 sb = new StringBuilder("[dumpBrights] zone " + zone + " calcule : ");
                 for (int i = 0; i < 40; i++) sb.append(Mem.w(cur + (zone * 40 + i) * 2)).append(' ');
                 System.out.println(sb);
+                int zt = ab3d2.bss.ZoneBss.Zone_BrightTable_vl + zone * 4;
+                System.out.println("[dumpBrights] zone " + zone + " Zone_BrightTable : bas="
+                        + Mem.w(zt) + " haut=" + Mem.w(zt + 2));
                 sb = new StringBuilder("[dumpBrights] Anim_BrightTable : ");
                 for (int i = 0; i < 16; i++) sb.append(Mem.w(ab3d2.bss.AnimBss.Anim_BrightTable_vw + i * 2)).append(' ');
                 System.out.println(sb);
