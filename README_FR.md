@@ -54,7 +54,7 @@ le réécrit **ligne à ligne** en Java, sans approximation :
 
 ---
 
-## 2. Le remake full 3D, ailleurs
+## 2. Les deux projets frères
 
 Ce dépôt ne contient que le **portage fidèle** : la traduction ligne à ligne du moteur d'origine,
 qui reste la seule version complète et exacte.
@@ -67,7 +67,14 @@ les niveaux en vraie 3D et rejoue la même logique de jeu. Il s'appuie sur ce d�
 - comme **oracle** : quand un comportement du remake est douteux, c'est contre ce portage qu'on
   tranche, en instrumentant les deux et en comparant les traces.
 
-Ce dépôt-ci n'en dépend pas : il se compile et tourne seul.
+Il existe une troisième lecture :
+**[ab3d2-tkg-full-java](https://github.com/guillaumemonet/ab3d2-tkg-full-java)**, une
+**conversion orientée objet**. Les mêmes mécaniques d'origine, exactement, mais écrites comme on
+les écrirait aujourd'hui : pas de mémoire plate, pas de registres simulés — de vraies classes,
+des champs nommés, des collections. Elle aussi tranche contre ce portage, par 47 oracles
+différentiels qui comparent champ par champ et pixel par pixel.
+
+Ce dépôt-ci ne dépend d'aucun des deux : il se compile et tourne seul.
 
 ## 3. Les données : les disquettes, et rien d'autre
 

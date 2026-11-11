@@ -54,7 +54,7 @@ rewrites it **line by line** in Java, without approximation:
 
 ---
 
-## 2. The full-3D remake, elsewhere
+## 2. The two sibling projects
 
 This repository holds the **faithful port** only: the line-by-line translation of the original
 engine, which remains the one complete and exact version.
@@ -67,7 +67,14 @@ true 3D and replays the same game logic. It leans on this repository in two ways
 - as the **oracle**: whenever the remake's behaviour looks wrong, it is settled against this port,
   by instrumenting both and diffing the traces.
 
-This repository does not depend on it: it builds and runs on its own.
+A third reading exists too:
+**[ab3d2-tkg-full-java](https://github.com/guillaumemonet/ab3d2-tkg-full-java)**, an
+**object-oriented conversion**. Same original mechanics, exactly, but written as one would write
+them today: no flat memory, no simulated registers — real classes, named fields, collections. It
+too settles every doubt against this port, through 47 differential oracles that compare field by
+field and pixel by pixel.
+
+Neither sibling is a dependency here: this repository builds and runs on its own.
 
 ## 3. The data: the floppies, and nothing else
 
