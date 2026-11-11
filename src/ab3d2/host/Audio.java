@@ -28,6 +28,37 @@ import static org.lwjgl.openal.ALC10.*;
 public final class Audio {
 
     private static final int SAMPLES_PER_BUF = 200;   // newsampbitl produit 200 octets/canal
+
+    /**
+     * Horloge PAL : la base de toute periode Paula.
+     */
+    private static final double PAL_CLOCK = 3546895.0;
+
+    /**
+     * FREQUENCE DE SORTIE, FIXE. C'est le DAC, pas une voie.
+     *
+     * <p>Paula melange quatre voies vers un convertisseur unique : elle n'asservit la sortie a
+     * aucune d'elles. Le portage le faisait — il prenait la periode de la VOIE 3 comme
+     * reference — et c'est ce qui faisait gresiller la musique de mort.
+     *
+     * <p>Pourquoi DIX MILLE. C'est le point de conception du jeu lui-meme : {@code newsampbitl}
+     * produit 200 octets par voie et par frame, et le jeu tourne a 50 Hz, soit 10000 octets par
+     * seconde. Une voie a la periode {@code PAL_CLOCK / 10000 = 354,69} lit donc son tampon
+     * exactement une fois par frame. C'est aussi, dans la boucle vive, ce qui fait appeler
+     * {@code newsampbitl} une fois par frame et pas zero ou huit — le role de l'IRQ Paula.
+     *
+     * <p>Et c'est assez haut pour ne sous-echantillonner aucune voie. Mesure des periodes
+     * reellement programmees : en jeu, voie 0 (musique) a 381 soit 9309 Hz, voies 1-3 a 443
+     * soit 8006 Hz ; a la mort, de 428 (8287 Hz) a 856 (4144 Hz). La plus aigue de tout le jeu
+     * est 9309 Hz, sous les dix mille.
+     */
+    private static final int OUT_RATE = 10000;
+
+    /**
+     * La periode de REFERENCE qui correspond a {@link #OUT_RATE} : une voie a cette periode se
+     * lit un octet par echantillon de sortie.
+     */
+    private static final double REF_PER = PAL_CLOCK / OUT_RATE;
     private static final int NUM_BUFFERS = 8;         // pool de buffers OpenAL
     private static final int TARGET_QUEUED = 4;       // profondeur de file visée
 
@@ -121,18 +152,17 @@ public final class Audio {
     /**
      * Lit les 4 canaux Paula (CustomChips), mixe en stéréo 16 bits et empile dans OpenAL.
      *
-     * Les canaux ont des PÉRIODES INDÉPENDANTES : en jeu, ch0 = musique (période propre),
-     * ch1-3 = SFX (période fixe, buffers de 200 octets rafraîchis par newsampbitl à chaque
-     * appel). Le taux de sortie = celui des SFX (1:1 pour ch1-3) ; tout canal de période
-     * différente (la musique) est ré-échantillonné via une phase persistante, en bouclant
-     * sur sa longueur d'échantillon (AUDxLEN mots).
+     * Les canaux ont des PÉRIODES INDÉPENDANTES, et la sortie n'en suit AUCUNE : elle est
+     * fixée à {@link #OUT_RATE}, comme le convertisseur de Paula. Chaque voie avance à sa
+     * propre période contre cette référence ({@code REF_PER / per} octet par échantillon de
+     * sortie), ce qui lui rend exactement son débit Paula {@code PAL_CLOCK / per} — la HAUTEUR
+     * de chaque voie est donc identique à l'ancien modèle, seul le rééchantillonnage change.
      */
     public static void queueFromPaula() {
         if (!running || freeCount == 0) {
             return;
         }
-        int refPer = CustomChips.audPER[3] > 0 ? CustomChips.audPER[3]
-                   : (CustomChips.audPER[1] > 0 ? CustomChips.audPER[1] : 443);
+        double refPer = REF_PER;
 
         consumeTriggers();
         pcm.clear();
@@ -144,12 +174,11 @@ public final class Audio {
         }
         pcm.flip();
 
-        int rate = 3546895 / refPer;                      // fréquence de sortie = horloge PAL / période SFX
-        // GARDE-FOU : une période Paula transitoire minuscule (1-2) ferait exploser le rate
-        // (jusqu'à ~3,5 MHz) → OpenAL alloue un buffer interne démesuré → STACK_BUFFER_OVERRUN natif
-        // (crash 0xC0000409 observé après un temps de jeu). On borne à une plage audio saine.
-        if (rate < 1000) rate = 1000;
-        else if (rate > 48000) rate = 48000;
+        // Le garde-fou qui bornait le taux a [1000, 48000] n'a plus d'objet : il traitait le
+        // symptome extreme de ce meme defaut. Une periode Paula transitoire minuscule faisait
+        // exploser le taux jusqu'a ~3,5 MHz, OpenAL allouait un tampon demesure, et ca finissait
+        // en STACK_BUFFER_OVERRUN natif (0xC0000409). Un taux CONSTANT ne peut plus exploser.
+        int rate = OUT_RATE;
 
         int buf = freePool[--freeCount];
         alBufferData(buf, AL_FORMAT_STEREO16, pcm, rate);
@@ -165,10 +194,11 @@ public final class Audio {
 
     /**
      * Échantillon 8 bits signé du canal Paula `ch` pour la i-ème trame de sortie, mis à
-     * l'échelle du volume (0..64). Période == refPer → lecture directe (1:1, SFX) ;
-     * sinon ré-échantillonnage par phase (musique) bouclé sur AUDxLEN*2 octets.
+     * l'échelle du volume (0..64). La voie avance de {@code REF_PER / per} octet par échantillon
+     * de sortie, soit {@code PAL_CLOCK / per} octets par seconde : son débit Paula exact, quelle
+     * que soit la fréquence de sortie. Le segment boucle sur AUDxLEN*2 octets.
      */
-    private static int smp(int ch, int refPer) {
+    private static int smp(int ch, double refPer) {
         int vol = CustomChips.audVOL[ch], per = CustomChips.audPER[ch];
         if (!segActive[ch] || vol == 0 || per <= 0 || segLC[ch] <= 0) {
             return 0;
@@ -186,7 +216,7 @@ public final class Audio {
             }
         }
         int s = (byte) Mem.ub(segLC[ch] + p);
-        segPos[ch] += (double) refPer / per;              // avance au débit du canal (pitch)
+        segPos[ch] += refPer / per;                       // avance au débit du canal (pitch)
         return s * vol / 64;
     }
 
@@ -204,9 +234,12 @@ public final class Audio {
     /** Mixe une trame (comme queueFromPaula) mais l'accumule en PCM stéréo 16 bits LE. */
     public static void captureFrame() {
         if (capBuf == null) capBuf = new java.io.ByteArrayOutputStream();
-        int refPer = CustomChips.audPER[3] > 0 ? CustomChips.audPER[3]
-                   : (CustomChips.audPER[1] > 0 ? CustomChips.audPER[1] : 443);
-        capRate = 3546895 / refPer;
+        // MEME REFERENCE FIXE que la boucle vive — sans quoi le WAV capture ne dirait pas la
+        // meme chose que ce qu'on entend. L'ancien capRate etait pris sur la DERNIERE frame,
+        // alors que la capture accumule 200 echantillons par frame de jeu : un module de 13,74 s
+        // sortait etiquete 8287 Hz, donc long de 16,58 s. Facteur 1,21, et il etait faux.
+        double refPer = REF_PER;
+        capRate = OUT_RATE;
         consumeTriggers();
         for (int i = 0; i < SAMPLES_PER_BUF; i++) {
             int l = clamp16((smp(0, refPer) + smp(3, refPer)) << 6);
