@@ -429,18 +429,52 @@ public final class ScreenC {
     }
 
     /** Construit le tampon ARGB de présentation (downscale 640→320) à l'intensité {@code fade} (0..255). */
-    private static void buildIntroArgb(int fade) {
+    /**
+     * Couleur de DEPART du fondu du texte d'intro, et son pas : {@code move.w #$10,d0} puis
+     * {@code add.w #$121,d0}, huit fois (hires.s:271-283, bloc commente de Game_Begin ;
+     * identique dans 4000test.s:541-550 PLAYTHEGAME, qui lui n'est pas commente).
+     *
+     * <p>Ce sont des mots couleur Amiga {@code $0RGB}, poses dans {@code TXTCOLL} — le registre
+     * {@code col1} de la copper list du texte, {@code col0} restant noir. La suite ecrite est
+     * $010, $131, $252, $373, $494, $5B5, $6D6, <b>$7F7</b> : le texte d'intro n'est pas blanc,
+     * il est VERT (R7 V15 B7). Une VBlank entre chaque pas, donc huit frames.
+     *
+     * <p>Le portage affichait un degrade de GRIS sur seize frames, faute d'avoir lu ce bloc.
+     * Les quartets ne debordent pas les uns dans les autres sur ces huit pas.
+     *
+     * <p>Non porte, et volontairement : le fondu de SORTIE {@code CLOSETXT}
+     * (4000test.s:1258-1270, de $8f8 par pas de -$121 puis noir) n'existe que dans l'ancien
+     * source. TKG ne l'a pas — son texte reste affiche pendant le chargement du disque, puis
+     * {@code INITCOPPERSCRN} le remplace.
+     */
+    private static final int INTRO_COLOUR_START = 0x010;
+    private static final int INTRO_COLOUR_STEP = 0x121;
+    private static final int INTRO_FADE_FRAMES = 8;
+
+    /** La couleur du texte d'intro a la frame {@code f}, en mot Amiga $0RGB. */
+    private static int introColour(int f) {
+        int n = Math.min(f, INTRO_FADE_FRAMES - 1);
+        return INTRO_COLOUR_START + n * INTRO_COLOUR_STEP;
+    }
+
+    /**
+     * @param couleur mot Amiga {@code $0RGB} ; chaque quartet est etendu a l'octet par x17
+     */
+    private static void buildIntroArgb(int couleur) {
         byte[] ram = Mem.RAM;
         if (presentBuffer == null) {
             presentBuffer = new int[SCREEN_WIDTH * SCREEN_HEIGHT];
         }
+        int r = ((couleur >> 8) & 0xF) * 17;
+        int g = ((couleur >> 4) & 0xF) * 17;
+        int b = (couleur & 0xF) * 17;
+        int argb = 0xFF000000 | (r << 16) | (g << 8) | b;
         for (int yy = 0; yy < SCREEN_HEIGHT; ++yy) {
             int srow = introScratch + yy * INTRO_W;
             int drow = yy * SCREEN_WIDTH;
             for (int xx = 0; xx < SCREEN_WIDTH; ++xx) {
                 int lit = (ram[srow + xx * 2] | ram[srow + xx * 2 + 1]) & 1; // downscale OR
-                int v = lit != 0 ? fade : 0;
-                presentBuffer[drow + xx] = 0xFF000000 | (v << 16) | (v << 8) | v;
+                presentBuffer[drow + xx] = lit != 0 ? argb : 0xFF000000;     // col0 = noir
             }
         }
     }
@@ -449,10 +483,10 @@ public final class ScreenC {
     private static void introPresentLoop() {
         int fk = Mem.ub(ab3d2.ControlloopData.fire_key);
         for (int frame = 0; frame < 400; ++frame) {
-            buildIntroArgb(frame < 16 ? frame * 16 : 255);   // fondu sur 16 frames
+            buildIntroArgb(introColour(frame));              // $010 -> $7F7 en huit frames
             display.present(presentBuffer);
             display.pollEvents();
-            if (frame > 16) {                                // après le fondu : attendre la validation
+            if (frame >= INTRO_FADE_FRAMES) {                // après le fondu : attendre la validation
                 if (ab3d2.host.CustomChips.mouseLeftPressed
                         || Mem.ub(KeyMap_vb + fk) != 0
                         || Mem.ub(KeyMap_vb + ab3d2.modules.RawKeyMacros.RAWKEY_SPACEBAR) != 0
@@ -470,7 +504,7 @@ public final class ScreenC {
             System.err.println("[dumpIntroText] TEXT_FILE non chargé (Lvl_IntroTextPtr_l=0)");
             return;
         }
-        buildIntroArgb(255);
+        buildIntroArgb(introColour(INTRO_FADE_FRAMES - 1));   // la couleur de FIN du fondu
         saveLastPresent(path);
     }
 
