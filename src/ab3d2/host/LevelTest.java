@@ -139,7 +139,10 @@ public final class LevelTest {
             Mem.ww(Plr1_Energy_w, 191);
             Mem.ww(Plr2_Energy_w, 191);
             Mem.ww(Zone_OrderTable_Barrier_w, 0xFFFF);     // not.w de 0
-            Mem.wb(draw_GouraudFlatsSelected_b, 0xFF);
+            // DIAG : -PflatShade eteint l'ombrage INTERPOLE des sols, pour comparer les deux
+            // chemins separement avec la conversion.
+            Mem.wb(draw_GouraudFlatsSelected_b,
+                    System.getProperty("flatShade") != null ? 0 : 0xFF);
             // méthode de contrôle par défaut = souris (build non-CD32)
             Mem.wb(Plr1_Keys_b, 0); Mem.wb(Plr1_Path_b, 0); Mem.wb(Plr1_Mouse_b, 0xFF); Mem.wb(Plr1_Joystick_b, 0);
             Mem.wb(Plr2_Keys_b, 0); Mem.wb(Plr2_Path_b, 0); Mem.wb(Plr2_Mouse_b, 0xFF); Mem.wb(Plr2_Joystick_b, 0);

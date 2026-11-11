@@ -225,6 +225,9 @@ tasks.register('levelTest', JavaExec) {
     if (project.hasProperty('fov')) {
         systemProperty 'fov', project.property('fov').toString()
     }
+    if (project.hasProperty('flatShade')) {
+        systemProperty 'flatShade', '1'
+    }
     if (project.hasProperty('fullbright')) {
         systemProperty 'fullbright', project.property('fullbright').toString()
     }
