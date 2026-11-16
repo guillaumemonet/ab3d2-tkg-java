@@ -309,6 +309,16 @@ public final class LevelTest {
                 Hires.dbgGeomZone = Integer.parseInt(System.getProperty("geomZone"));
                 Hires.dbgGeomFrame = Long.parseLong(System.getProperty("geomFrame", "45"));
             }
+            if (System.getProperty("forceDoor") != null) {   // DIAG : porte posee de force
+                String[] fd = System.getProperty("forceDoor").split(" ");
+                ab3d2.Newanims.dbgForceDoor = Integer.parseInt(fd[0]);
+                ab3d2.Newanims.dbgForceDoorPos = Integer.parseInt(fd[1]);
+                System.out.println("[LevelTest] porte " + fd[0] + " posee a " + fd[1]);
+            }
+            if ("1".equals(System.getProperty("use"))) {     // DIAG : bat ACTIONNER
+                Hires.dbgUse = true;
+                System.out.println("[LevelTest] touche ACTIONNER battue une image sur deux");
+            }
             if ("1".equals(System.getProperty("walk"))) {    // DIAG : avance (ouvre les portes)
                 Hires.dbgWalk = true;
             }

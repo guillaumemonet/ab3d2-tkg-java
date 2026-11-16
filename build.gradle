@@ -195,6 +195,12 @@ tasks.register('levelTest', JavaExec) {
     if (project.hasProperty('geomFrame')) {
         systemProperty 'geomFrame', project.property('geomFrame').toString()
     }
+    if (project.hasProperty('forceDoor')) {         // DIAG : "rang position"
+        systemProperty 'forceDoor', project.property('forceDoor').toString()
+    }
+    if (project.hasProperty('use')) {               // DIAG : bat la touche ACTIONNER
+        systemProperty 'use', '1'
+    }
     if (project.hasProperty('walk')) {              // DIAG : avance en continu (ouvre les portes)
         systemProperty 'walk', project.property('walk').toString()
     }

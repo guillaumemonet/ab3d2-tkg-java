@@ -1048,6 +1048,10 @@ public final class Newanims {
             switch (lbl) {
                 case DOADOOR: {
                     Mem.ww(anim_CurrentLiftable_w, Mem.uw(anim_CurrentLiftable_w) + 1); // add.w #1,anim_CurrentLiftable_w
+                    if (dbgForceDoor == (short) Mem.uw(anim_CurrentLiftable_w)) { // DIAG
+                        Mem.ww(a0 + 22, dbgForceDoorPos);   // position
+                        Mem.ww(a0 + 24, 0);                 // vitesse
+                    }
                     d0 = setw(0, Mem.uw(a0)); a0 += 2; // move.w (a0)+,d0  (bottom)
                     if ((short) d0 == 999) {           // cmp.w #999,d0 ; bne notalldoorsdone
                         Mem.ww(a6, 999);               // move.w #999,(a6)
@@ -1225,6 +1229,13 @@ public final class Newanims {
                         a2 = a2 + (short) d0;          // adda.w d0,a2
                         Mem.ww(a1 + 12, a2);           // move.w a2,12(a1)
                         Mem.wl(a1 + 24, d3);           // move.l d3,24(a1)
+                        if (dbgForceDoor >= 0) {       // DIAG
+                            System.out.println("[panPorte] offset="
+                                    + (a1 - Mem.l(ab3d2.bss.LevelBss.Lvl_GraphicsPtr_l))
+                                    + " texture=" + Mem.uw(a1 + 12)
+                                    + " bas=" + Mem.l(a1 + 24)
+                                    + " haut=" + Mem.l(a1 + 20));
+                        }
                     }
                     // nomoredoorwalls (1496)
                     a6 += 2;                           // addq #2,a6
@@ -1246,6 +1257,13 @@ public final class Newanims {
                         a2 = a2 + (short) d0;          // adda.w d0,a2
                         Mem.ww(a1 + 12, a2);           // move.w a2,12(a1)
                         Mem.wl(a1 + 24, d3);           // move.l d3,24(a1)
+                        if (dbgForceDoor >= 0) {       // DIAG
+                            System.out.println("[panPorte] offset="
+                                    + (a1 - Mem.l(ab3d2.bss.LevelBss.Lvl_GraphicsPtr_l))
+                                    + " texture=" + Mem.uw(a1 + 12)
+                                    + " bas=" + Mem.l(a1 + 24)
+                                    + " haut=" + Mem.l(a1 + 20));
+                        }
                     }
                     a6 += 2;                           // (nomoredoorwalls) addq #2,a6
                     lbl = DOADOOR;
@@ -1261,6 +1279,12 @@ public final class Newanims {
     // ================================================================== DIAG portes
     /** -PdoorTrace=1 : suit l'etat des portes (verrou, type, declenchement). */
     public static boolean dbgDoors = false;
+
+    /** DIAG : le rang d'une porte a POSER DE FORCE a chaque image, ou -1. */
+    public static int dbgForceDoor = -1;
+
+    /** DIAG : la position imposee a {@link #dbgForceDoor}. Offsets 22 et 24 du record. */
+    public static int dbgForceDoorPos = 0;
     private static final java.util.Map<Integer, Boolean> dbgLocked = new java.util.HashMap<>();
 
     /** Imprime au CHANGEMENT d'etat de verrou, pour ne pas noyer la sortie. */

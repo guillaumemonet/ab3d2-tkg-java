@@ -2374,6 +2374,12 @@ public final class Hires {
                 Mem.wb(ab3d2.bss.TablesBss.KeyMap_vb
                         + Mem.ub(ab3d2.ControlloopData.forward_key), 0xFF);
             }
+            if (dbgUse) {                                    // DIAG : bat ACTIONNER
+                Mem.wb(ab3d2.bss.TablesBss.KeyMap_vb
+                        + Mem.ub(ab3d2.ControlloopData.operate_key),
+                        (dbgFrame & 1) == 0 ? 0xFF : 0);
+            }
+            dbgFrame++;
             if (loopFrameLimit >= 0 && loopFrameLimit-- == 0) return; // hook de test (arrêt après N frames)
             if (headless && headlessStop) return;            // jME a demandé l'arrêt
             if (loopFrameLimit < 0) {                        // mode interactif (hôte) : sortie sur fermeture fenêtre
@@ -4793,6 +4799,19 @@ public final class Hires {
 
     /** DIAG : maintient la touche AVANCER, pour declencher les portes a proximite. */
     public static boolean dbgWalk;
+
+    /**
+     * DIAG : bat la touche ACTIONNER une image sur deux.
+     *
+     * <p>Elle ne se tient pas : le jeu ne la retient qu'au FRONT MONTANT
+     * (plr_PrevUseKeyState_b). La tenir enfoncee n'ouvre donc qu'une porte, celle qu'on a
+     * devant soi a la premiere image. En la battant, on ouvre celle devant laquelle on se
+     * trouve, quelle que soit l'image — ce qu'il faut pour comparer une porte EN MOUVEMENT.
+     */
+    public static boolean dbgUse;
+
+    /** Le rang de l'image, pour le battement ci-dessus. */
+    public static int dbgFrame;
 
     /** DIAG : releve la position et l'angle du joueur toutes les N frames (0 = desactive). */
     public static int dbgPlayerTraceEvery;
