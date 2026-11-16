@@ -499,6 +499,34 @@ public final class ScreenC {
         }
     }
 
+    /**
+     * L'ECRAN DU TEXTE D'INTRO d'un niveau, un octet par pixel (0 ou 1), ou null s'il n'y a
+     * pas de TEXT_FILE charge.
+     *
+     * <p>C'est le tampon 640 ramene a 320 par le meme OU que l'affichage, mais sans couleur :
+     * de quoi comparer un autre moteur ligne a ligne, sans passer par une image.
+     */
+    public static byte[] introScreen(int level) {
+        if (!renderIntroScratch(level)) {
+            return null;
+        }
+        byte[] ram = Mem.RAM;
+        byte[] out = new byte[SCREEN_WIDTH * SCREEN_HEIGHT];
+        for (int y = 0; y < SCREEN_HEIGHT; y++) {
+            int from = introScratch + y * INTRO_W;
+            int to = y * SCREEN_WIDTH;
+            for (int x = 0; x < SCREEN_WIDTH; x++) {
+                out[to + x] = (byte) ((ram[from + x * 2] | ram[from + x * 2 + 1]) & 1);
+            }
+        }
+        return out;
+    }
+
+    /** La couleur du texte d'intro a la frame donnee, en mot Amiga $0RGB. */
+    public static int introColourAt(int frame) {
+        return introColour(frame);
+    }
+
     /** Hook de test : rend le texte d'intro du niveau et capture le PNG (sans boucle d'affichage). */
     public static void dumpIntroText(int level, String path) {
         if (!renderIntroScratch(level)) {
