@@ -260,12 +260,38 @@ traces**. Quelques exemples de ce que cette méthode a débusqué :
 
 ---
 
-## 10. Licence & crédits
+## 10. Mentions légales et données du jeu
 
-*Alien Breed 3D II : The Killing Grounds* et ses données sont la propriété de **Team17**. Ce
-projet est un portage **non commercial** à but d'étude et de préservation. Les assets du jeu ne
-sont **pas** redistribués avec ce dépôt : il faut posséder le jeu et fournir ses disquettes.
+### Implémentation indépendante du moteur
 
-Moteur d'origine : Team17 (Andy Clitheroe et al.). Sources ASM/C de référence :
-[mheyer32/alienbreed3d2](https://github.com/mheyer32/alienbreed3d2). Portage Java :
-**Guillaume Monet**.
+Ce projet est une réimplémentation indépendante du moteur d'*Alien Breed 3D II : The Killing Grounds*, conçue pour reproduire le comportement du jeu d'origine sur les plateformes modernes.
+
+Le moteur a été développé à partir du code source d'origine (assembleur 68000 et C), tel qu'il est publié dans [mheyer32/alienbreed3d2](https://github.com/mheyer32/alienbreed3d2), par analyse technique et tests de compatibilité. Ce code source n'est pas inclus dans ce dépôt.
+
+### Fichiers du jeu d'origine
+
+Ce projet nécessite des fichiers du jeu d'origine, comme les images de disquettes Amiga (ADF), pour fonctionner.
+
+**Les fichiers du jeu d'origine ne sont pas inclus dans ce projet.**
+
+Chaque utilisateur doit se procurer et fournir ses propres fichiers de jeu auprès d'une source légalement autorisée. Avant de télécharger ou d'utiliser ce moteur, l'utilisateur doit confirmer qu'il possède une copie du jeu d'origine obtenue légalement.
+
+Seule exception : les tables `incbin` que l'exécutable d'origine incorporait, qui ne sont sur aucune disquette.
+
+Eloane Studio n'héberge, ne distribue ni ne fournit de copies non autorisées de données de jeu protégées par le droit d'auteur.
+
+### Droits d'auteur et marques
+
+Les noms, marques, graphismes, musiques et autres éléments propriétaires d'*Alien Breed 3D II : The Killing Grounds* restent la propriété de leurs titulaires respectifs (Team17).
+
+Ce projet est une implémentation indépendante et non officielle ; il n'est ni affilié, ni approuvé, ni soutenu par les développeurs ou les éditeurs du jeu d'origine.
+
+### Préservation
+
+Ce projet a pour but de préserver le comportement technique et l'expérience de jeu des jeux vidéo classiques, tout en les rendant accessibles sur les systèmes modernes.
+
+Le moteur est fourni à des fins de compatibilité, de préservation et d'éducation.
+
+### Licence et crédits
+
+Projet **non commercial**, à but d'étude et de préservation. Moteur d'origine : Team17 (Andy Clitheroe et al.). Sources ASM/C de référence : [mheyer32/alienbreed3d2](https://github.com/mheyer32/alienbreed3d2). Portage Java : **Guillaume Monet**.
