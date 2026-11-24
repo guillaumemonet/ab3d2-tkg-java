@@ -8,7 +8,7 @@ natively on PC through LWJGL 3.
 
 > Ported by **Guillaume Monet**, with Claude's assistance.
 
-*[Version française](README_FR.md)*
+*[Version française](README_fr.md)*
 
 ![The original engine](docs/img/classic-niveau.png)
 
@@ -186,7 +186,7 @@ The LWJGL dependencies (GLFW, OpenGL, OpenAL) are fetched from Maven Central on 
 ```
 java/                       ← repository root
 ├── README.md             this file (English)
-├── README_FR.md          version française
+├── README_fr.md          version française
 ├── build.gradle
 ├── docs/                   architecture and porting notes (PORT_SUBSYS_*, PVS.md)
 ├── resources/incbin/       the incbin files linked into the original binary (see §3)

@@ -107,7 +107,7 @@ Les dépendances LWJGL (GLFW, OpenGL, OpenAL) sont récupérées depuis Maven Ce
 ```
 java/                       ← racine du dépôt
 ├── README.md             version anglaise
-├── README_FR.md          ce fichier
+├── README_fr.md          ce fichier
 ├── build.gradle
 ├── docs/                   architecture et notes de portage (PORT_SUBSYS_*, PVS.md)
 ├── resources/incbin/       les incbin liés au binaire d'origine (cf. §3)
